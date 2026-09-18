@@ -28,6 +28,7 @@ import {
 import { CONFIG } from '../config';
 import { MivotryAPI, NotificacionPendienteItem, DashboardResponse } from '../services/api';
 import { parseBankSMS } from '../services/smsParser';
+import * as Clipboard from 'expo-clipboard';
 
 interface Props {
   visible: boolean;
@@ -59,6 +60,13 @@ export const NotificationsInboxModal: React.FC<Props> = ({
 
   // Modo instrucciones MacroDroid / Webhook
   const [showWebhookGuide, setShowWebhookGuide] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const handleCopyWebhookUrl = async () => {
+    await Clipboard.setStringAsync(CONFIG.API_URL);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   // Categorías editadas localmente por id
   const [selectedCategories, setSelectedCategories] = useState<{ [id: string]: string }>({});
@@ -348,14 +356,41 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                 Si tienes Android, instala <Text style={{ color: '#38BDF8', fontWeight: '700' }}>MacroDroid</Text> (gratis en Play Store) y crea esta regla sencilla:
               </Text>
               <View style={styles.guideStepBox}>
-                <Text style={styles.guideStepText}>1. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Disparador:</Text> Notificación recibida de Bancolombia / Peoplepass.</Text>
-                <Text style={styles.guideStepText}>2. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Acción:</Text> Abrir sitio web / Solicitud HTTP POST a esta URL:</Text>
+                <Text style={styles.guideStepText}>1. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Disparador:</Text> Notificación recibida (Bancolombia / Peoplepass) o SMS recibido.</Text>
+                <Text style={styles.guideStepText}>2. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Acción:</Text> Solicitud HTTP POST a esta URL:</Text>
                 <View style={styles.urlBox}>
                   <Text style={styles.urlText} numberOfLines={2} selectable={true}>
-                    {webhookUrl}
+                    {CONFIG.API_URL}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.copyUrlBtn, copiedUrl && styles.copyUrlBtnDone]}
+                    onPress={handleCopyWebhookUrl}
+                    activeOpacity={0.8}
+                  >
+                    {copiedUrl ? (
+                      <>
+                        <Check size={12} color="#06181D" />
+                        <Text style={styles.copyUrlBtnTextDone}>¡URL Copiada al Portapapeles!</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} color={CONFIG.COLORS.accentMint} />
+                        <Text style={styles.copyUrlBtnText}>Copiar URL de la Hoja</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.guideStepText}>3. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Cuerpo del POST (Body):</Text></Text>
+                <View style={styles.codeSnippetBox}>
+                  <Text style={styles.codeSnippetTitle}>Para Notificaciones Push:</Text>
+                  <Text style={styles.codeSnippetText} selectable={true}>
+                    {`{"action": "recibirNotificacionExterna", "texto": "{not_title} {not_body}"}`}
+                  </Text>
+                  <Text style={[styles.codeSnippetTitle, { marginTop: 6 }]}>Para Mensajes SMS:</Text>
+                  <Text style={styles.codeSnippetText} selectable={true}>
+                    {`{"action": "recibirNotificacionExterna", "texto": "{sms_number}: {sms_message}"}`}
                   </Text>
                 </View>
-                <Text style={styles.guideStepText}>3. <Text style={{ fontWeight: '700', color: '#F1F5F9' }}>Cuerpo del POST:</Text> {"{ \"texto\": \"[notification_text]\" }"}</Text>
               </View>
               <Text style={styles.guideFooterNote}>
                 ¡Listo! Con eso, cada vez que pagues en la calle, el gasto esperará en esta bandeja para que lo apruebes en 1 segundo cuando tú quieras.
@@ -708,6 +743,54 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.accentGold,
     fontSize: 10,
     fontFamily: 'monospace'
+  },
+  copyUrlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)'
+  },
+  copyUrlBtnDone: {
+    backgroundColor: CONFIG.COLORS.accentMint,
+    borderColor: CONFIG.COLORS.accentMint
+  },
+  copyUrlBtnText: {
+    color: CONFIG.COLORS.accentMint,
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  copyUrlBtnTextDone: {
+    color: '#06181D',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  codeSnippetBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)'
+  },
+  codeSnippetTitle: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2
+  },
+  codeSnippetText: {
+    color: '#F1F5F9',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    backgroundColor: '#06181D',
+    padding: 6,
+    borderRadius: 4
   },
   guideFooterNote: {
     color: '#64748B',
