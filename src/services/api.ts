@@ -29,6 +29,7 @@ export interface DashboardResponse {
     quincenaBase: number;
     mensualBase: number;
     fondoOcasional: number;
+    totalManejoF21?: number;
     gastos: GastoItem[];
   };
   bonos: {

@@ -143,7 +143,8 @@ export default function App() {
   const totalPresupuestadoQ = nominaGastos.reduce((acc, item) => {
     return acc + (activeQuincena === 15 ? (item.q15 || 0) : (item.q30 || 0));
   }, 0);
-  const totalManejoActual = nominaGastos.reduce((acc, item) => acc + (item.manejoActual || 0), 0);
+  // Total de Manejo: preferir celda F:21 del sheet ($585.000) o la sumatoria de rubros activos
+  const totalManejoActual = dashboardData?.nomina.totalManejoF21 ?? nominaGastos.reduce((acc, item) => acc + (item.manejoActual || 0), 0);
   const porcentajeManejo = totalPresupuestadoQ > 0 ? Math.min(100, Math.round((totalManejoActual / totalPresupuestadoQ) * 100)) : 0;
 
   return (
@@ -192,21 +193,25 @@ export default function App() {
             {/* HERO CARD DE SALDOS */}
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
-                <Text style={styles.heroLabel}>Presupuesto Quincenal Base</Text>
+                <Text style={styles.heroLabel}>Disponible en Manejo (Te queda)</Text>
                 <View style={styles.chipTag}>
                   <Text style={styles.chipText}>Quincena {activeQuincena}</Text>
                 </View>
               </View>
-              <Text style={styles.heroAmount}>
-                {formatCOP(dashboardData?.nomina.quincenaBase || 4950000)}
+
+              {/* CIFRA GIGANTE: SALDO DISPONIBLE VIVO */}
+              <Text style={[styles.heroAmount, { color: CONFIG.COLORS.accentMint }]}>
+                {formatCOP(totalManejoActual)}
               </Text>
 
-              {/* BARRA DE PROGRESO DE MANEJO */}
+              {/* BARRA DE PROGRESO & PRESUPUESTO BASE */}
               <View style={styles.progressSection}>
                 <View style={styles.progressTextRow}>
-                  <Text style={styles.progressLabel}>Disponible en Manejo</Text>
+                  <Text style={styles.progressLabel}>
+                    Base Q{activeQuincena}: {formatCOP(activeQuincena === 15 ? 4950000 : 4950000)}
+                  </Text>
                   <Text style={styles.progressValue}>
-                    {formatCOP(totalManejoActual)} ({porcentajeManejo}%)
+                    {porcentajeManejo}% disponible
                   </Text>
                 </View>
                 <View style={styles.progressBarTrack}>

@@ -247,7 +247,8 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       style={styles.container}
     >
       <FlatList

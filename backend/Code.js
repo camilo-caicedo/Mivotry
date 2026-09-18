@@ -91,7 +91,7 @@ function getDashboardData() {
   const mensualBase = cleanNumber(sheet.getRange("B2").getValue());   // $9,900,000
   
   // B. Rubros de Presupuesto Quincenal y Manejo (Filas 4 a 18)
-  const rowsPresupuesto = sheet.getRange("A4:F18").getValues();
+  const rowsPresupuesto = sheet.getRange("A4:F19").getValues();
   const gastosNomina = [];
   
   for (let i = 0; i < rowsPresupuesto.length; i++) {
@@ -117,6 +117,7 @@ function getDashboardData() {
   
   // C. Fondo Ocasional / Vacaciones (Celda F20)
   const fondoOcasional = cleanNumber(sheet.getRange("F20").getValue());
+  const totalManejoCalculadoSheet = cleanNumber(sheet.getRange("F21").getValue()); // $585,000
   
   // D. Tarjeta de Bonos (Filas 23 a 27, Columnas A a C)
   const bonosPresupuestoTotal = cleanNumber(sheet.getRange("B22").getValue()); // $1,600,000
@@ -228,6 +229,7 @@ function getDashboardData() {
       quincenaBase: quincenaBase,
       mensualBase: mensualBase,
       fondoOcasional: fondoOcasional,
+      totalManejoF21: totalManejoCalculadoSheet,
       gastos: gastosNomina
     },
     bonos: {
@@ -280,7 +282,7 @@ function registrarGasto(payload) {
   let saldoActual = 0;
   
   if (cuenta === "nomina") {
-    const values = sheet.getRange("A4:A18").getValues();
+    const values = sheet.getRange("A4:A19").getValues();
     for (let i = 0; i < values.length; i++) {
       if (String(values[i][0]).trim().toLowerCase() === categoria.toLowerCase()) {
         targetRow = 4 + i;
@@ -340,7 +342,7 @@ function cargarQuincena(payload) {
   
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
-  const rows = sheet.getRange("A4:F18").getValues();
+  const rows = sheet.getRange("A4:F19").getValues();
   
   const actualizados = [];
   const colIndexQuincena = (quincena === 15) ? 2 : 3; // Columna C (15) o D (30)
