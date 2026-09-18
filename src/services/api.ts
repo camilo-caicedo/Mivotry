@@ -50,6 +50,9 @@ export interface DashboardResponse {
   bolsillos: {
     inversiones: number;
     pagosAnuales: number;
+    totalCompleto: number;
+    totalDeudas: number;
+    totalAhorros: number;
     totalRendimientos: number;
   };
   pagosAnuales: PagoAnualItem[];

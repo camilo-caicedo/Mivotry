@@ -255,11 +255,11 @@ export default function App() {
 
             <View style={styles.metricsGrid}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Total Ahorrado en Bolsillos</Text>
+                <Text style={styles.metricLabel}>Total Bolsillo (I:30)</Text>
                 <Text style={[styles.metricValue, { color: CONFIG.COLORS.accentGold }]}>
-                  {formatCOP(dashboardData?.bolsillos.totalRendimientos || 7800000)}
+                  {formatCOP(dashboardData?.bolsillos.totalCompleto ?? dashboardData?.bolsillos.totalRendimientos ?? 7800000)}
                 </Text>
-                <Text style={styles.metricSub}>Bolsillos (Inversiones + Pagos anuales)</Text>
+                <Text style={styles.metricSub}>Ahorros: {formatCOP(dashboardData?.bolsillos.totalAhorros ?? 7800000)}</Text>
               </View>
 
               <View style={styles.metricCard}>
@@ -408,23 +408,49 @@ export default function App() {
 
         {activeTab === 'bolsillos' && (
           <View style={styles.tabContainer}>
+            {/* HERO TOTAL BOLSILLO I:30 */}
+            <View style={styles.heroCard}>
+              <View style={styles.heroHeader}>
+                <Text style={styles.heroLabel}>Total Completo Bolsillo (I:30)</Text>
+                <View style={styles.chipTag}>
+                  <Text style={styles.chipText}>En Rendimiento</Text>
+                </View>
+              </View>
+              <Text style={styles.heroAmount}>
+                {formatCOP(dashboardData?.bolsillos.totalCompleto ?? dashboardData?.bolsillos.totalRendimientos ?? 7800000)}
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ color: '#94A3B8', fontSize: 13 }}>Total Ahorros (I:32):</Text>
+                <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>
+                  {formatCOP(dashboardData?.bolsillos.totalAhorros ?? 7800000)}
+                </Text>
+              </View>
+            </View>
+
+            {/* DESGLOSE DE CAPITAL GUARDADO */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Ahorro en Bolsillos & Rendimientos</Text>
+              <Text style={styles.cardTitle}>Desglose de Ahorro Guardado</Text>
               <Text style={styles.cardDesc}>
-                Fondos resguardados en bolsillos remunerados (el rendimiento se genera en la entidad bancaria, aquí se controla el capital ahorrado).
+                Capital resguardado en el bolsillo generando rendimientos diarios:
               </Text>
               <View style={styles.debtDivider} />
               <View style={styles.debtRow}>
-                <Text style={styles.debtName}>Ahorro en Inversiones</Text>
+                <View>
+                  <Text style={styles.debtName}>Bolsillo Inversiones</Text>
+                  <Text style={styles.debtMeta}>Capital a largo plazo</Text>
+                </View>
                 <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentGold }]}>
-                  {formatCOP(dashboardData?.bolsillos.inversiones || 6800000)}
+                  {formatCOP(dashboardData?.bolsillos.inversiones ?? 6800000)}
                 </Text>
               </View>
               <View style={styles.debtDivider} />
               <View style={styles.debtRow}>
-                <Text style={styles.debtName}>Ahorro Pagos Anuales (Fondeado)</Text>
+                <View>
+                  <Text style={styles.debtName}>Ahorro Pagos Anuales</Text>
+                  <Text style={styles.debtMeta}>Fondeado con primas semestrales</Text>
+                </View>
                 <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentMint }]}>
-                  {formatCOP(dashboardData?.bolsillos.pagosAnuales || 1000000)}
+                  {formatCOP(dashboardData?.bolsillos.pagosAnuales ?? 1000000)}
                 </Text>
               </View>
             </View>

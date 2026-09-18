@@ -192,10 +192,12 @@ function getDashboardData() {
   }
   const totalPorCobrar = cleanNumber(sheet.getRange("F29").getValue());
   
-  // H. Bolsillo de Rendimientos & Ahorros (Filas 24 a 29, Columnas H e I)
-  const ahorroInversiones = cleanNumber(sheet.getRange("I26").getValue()); // $6,800,000 (Bolsillo inversiones)
-  const ahorroPagosAnuales = cleanNumber(sheet.getRange("I27").getValue()); // $1,000,000 (Ahorro pagos anuales)
-  const totalBolsillo = cleanNumber(sheet.getRange("I28").getValue()); // $7,800,000 (Total Ahorros)
+  // H. Bolsillo de Rendimientos & Ahorros (Columna I)
+  const ahorroInversiones = cleanNumber(sheet.getRange("I27").getValue()); // Bolsillo inversiones ($6,800,000)
+  const ahorroPagosAnuales = cleanNumber(sheet.getRange("I28").getValue()); // Ahorro pagos anuales ($1,000,000)
+  const totalCompleto = cleanNumber(sheet.getRange("I30").getValue()); // Total Completo ($7,800,000)
+  const totalDeudasBolsillo = cleanNumber(sheet.getRange("I31").getValue()); // Deudas ($0)
+  const totalAhorrosBolsillo = cleanNumber(sheet.getRange("I32").getValue()); // Ahorros ($7,800,000)
   
   // I. Pagos Anuales (Filas 24 a 28, Columnas K a O)
   const rowsAnuales = sheet.getRange("K25:O29").getValues();
@@ -247,7 +249,10 @@ function getDashboardData() {
     bolsillos: {
       inversiones: ahorroInversiones,
       pagosAnuales: ahorroPagosAnuales,
-      totalRendimientos: totalBolsillo
+      totalCompleto: totalCompleto,
+      totalDeudas: totalDeudasBolsillo,
+      totalAhorros: totalAhorrosBolsillo,
+      totalRendimientos: totalCompleto
     },
     pagosAnuales: pagosAnuales
   };
