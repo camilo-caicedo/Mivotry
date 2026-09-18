@@ -190,12 +190,12 @@ function getDashboardData() {
   const totalPorCobrar = cleanNumber(sheet.getRange("F29").getValue());
   
   // H. Bolsillo de Rendimientos & Ahorros (Filas 24 a 29, Columnas H e I)
-  const ahorroInversiones = cleanNumber(sheet.getRange("I27").getValue()); // $6,800,000
-  const ahorroPagosAnuales = cleanNumber(sheet.getRange("I28").getValue()); // $1,000,000
-  const totalBolsillo = cleanNumber(sheet.getRange("I29").getValue()); // $7,800,000
+  const ahorroInversiones = cleanNumber(sheet.getRange("I26").getValue()); // $6,800,000 (Bolsillo inversiones)
+  const ahorroPagosAnuales = cleanNumber(sheet.getRange("I27").getValue()); // $1,000,000 (Ahorro pagos anuales)
+  const totalBolsillo = cleanNumber(sheet.getRange("I28").getValue()); // $7,800,000 (Total Ahorros)
   
   // I. Pagos Anuales (Filas 24 a 28, Columnas K a O)
-  const rowsAnuales = sheet.getRange("K24:O28").getValues();
+  const rowsAnuales = sheet.getRange("K25:O29").getValues();
   const pagosAnuales = [];
   for (let i = 0; i < rowsAnuales.length; i++) {
     const row = rowsAnuales[i];

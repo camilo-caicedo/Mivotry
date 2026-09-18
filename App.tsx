@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   StatusBar,
   Dimensions,
   Image,
@@ -31,6 +30,7 @@ import {
   AlertTriangle
 } from 'lucide-react-native';
 
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CONFIG } from './src/config';
 import { MivotryAPI, DashboardResponse, GastoItem } from './src/services/api';
 
@@ -97,7 +97,8 @@ export default function App() {
 
   if (loading && !dashboardData) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#06181D" />
         <Image
           source={require('./assets/icon.png')}
@@ -105,7 +106,8 @@ export default function App() {
         />
         <ActivityIndicator size="large" color={CONFIG.COLORS.accentMint} />
         <Text style={styles.loadingText}>Conectando con tu Google Sheet...</Text>
-      </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
@@ -118,7 +120,8 @@ export default function App() {
   const porcentajeManejo = totalPresupuestadoQ > 0 ? Math.min(100, Math.round((totalManejoActual / totalPresupuestadoQ) * 100)) : 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#06181D" />
 
       {/* CABECERA SUPERIOR */}
@@ -226,11 +229,11 @@ export default function App() {
 
             <View style={styles.metricsGrid}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Total en Rendimiento</Text>
+                <Text style={styles.metricLabel}>Total Ahorrado en Bolsillos</Text>
                 <Text style={[styles.metricValue, { color: CONFIG.COLORS.accentGold }]}>
                   {formatCOP(dashboardData?.bolsillos.totalRendimientos || 7800000)}
                 </Text>
-                <Text style={styles.metricSub}>Generando intereses diarios</Text>
+                <Text style={styles.metricSub}>Bolsillos (Inversiones + Pagos anuales)</Text>
               </View>
 
               <View style={styles.metricCard}>
@@ -364,9 +367,9 @@ export default function App() {
         {activeTab === 'bolsillos' && (
           <View style={styles.tabContainer}>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Estrategia de Float & Rendimientos</Text>
+              <Text style={styles.cardTitle}>Ahorro en Bolsillos & Rendimientos</Text>
               <Text style={styles.cardDesc}>
-                Aprovecha el interés compuesto diario resguardando cuotas hasta su fecha de vencimiento.
+                Fondos resguardados en bolsillos remunerados (el rendimiento se genera en la entidad bancaria, aquí se controla el capital ahorrado).
               </Text>
               <View style={styles.debtDivider} />
               <View style={styles.debtRow}>
@@ -377,7 +380,7 @@ export default function App() {
               </View>
               <View style={styles.debtDivider} />
               <View style={styles.debtRow}>
-                <Text style={styles.debtName}>Ahorro Pagos Anuales (Fondeo Primas)</Text>
+                <Text style={styles.debtName}>Ahorro Pagos Anuales (Fondeado)</Text>
                 <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentMint }]}>
                   {formatCOP(dashboardData?.bolsillos.pagosAnuales || 1000000)}
                 </Text>
@@ -421,7 +424,8 @@ export default function App() {
           <Text style={[styles.navLabel, activeTab === 'bolsillos' && styles.navLabelActive]}>Bolsillos</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
