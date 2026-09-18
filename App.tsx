@@ -32,7 +32,9 @@ import {
   AlertTriangle,
   Compass,
   Utensils,
-  X
+  X,
+  Plus,
+  ChevronDown
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -149,6 +151,16 @@ export default function App() {
     setMontoInput('');
     setConceptoInput('');
     setModalVisible(true);
+  };
+
+  const handleOpenFloatingExpense = () => {
+    const list = activeAccount === 'nomina' ? dashboardData?.nomina.gastos : dashboardData?.bonos.gastos;
+    const defaultGasto = list && list.length > 0 ? list[0] : null;
+    if (defaultGasto) {
+      handleOpenExpenseModal(defaultGasto, activeAccount);
+    } else {
+      handleOpenExpenseModal({ fila: 4, nombre: 'Salidas', presupuestoTotal: 600000, manejoActual: 240000 }, 'nomina');
+    }
   };
 
   const handleSaveExpense = async () => {
@@ -634,6 +646,18 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      {/* BOTÓN FLOTANTE (FAB) PARA REGISTRAR GASTO EN DASHBOARD Y MANEJO */}
+      {(activeTab === 'dashboard' || activeTab === 'manejo') && (
+        <TouchableOpacity
+          style={styles.floatingActionButton}
+          activeOpacity={0.85}
+          onPress={handleOpenFloatingExpense}
+        >
+          <Plus size={24} color="#06181D" />
+          <Text style={styles.floatingActionText}>Gasto</Text>
+        </TouchableOpacity>
+      )}
+
       {/* MODAL BOTTOM SHEET: REGISTRO MANUAL DE GASTO */}
       <Modal
         visible={modalVisible}
@@ -658,6 +682,94 @@ export default function App() {
                 <X size={20} color="#94A3B8" />
               </TouchableOpacity>
             </View>
+
+            {/* SELECTOR DE CUENTA DENTRO DEL MODAL */}
+            <View style={styles.modalAccountToggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalAccountToggleBtn,
+                  selectedGasto?.cuenta === 'nomina' && styles.modalAccountToggleBtnActive
+                ]}
+                onPress={() => {
+                  const firstNomina = dashboardData?.nomina.gastos[0];
+                  if (firstNomina) {
+                    setSelectedGasto({
+                      nombre: firstNomina.nombre,
+                      cuenta: 'nomina',
+                      manejoActual: firstNomina.manejoActual,
+                      presupuestoTotal: firstNomina.presupuestoTotal
+                    });
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.modalAccountToggleText,
+                    selectedGasto?.cuenta === 'nomina' && styles.modalAccountToggleTextActive
+                  ]}
+                >
+                  Sueldo Nómina
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalAccountToggleBtn,
+                  selectedGasto?.cuenta === 'bonos' && styles.modalAccountToggleBtnActive
+                ]}
+                onPress={() => {
+                  const firstBono = dashboardData?.bonos.gastos[0];
+                  if (firstBono) {
+                    setSelectedGasto({
+                      nombre: firstBono.nombre,
+                      cuenta: 'bonos',
+                      manejoActual: firstBono.manejoActual,
+                      presupuestoTotal: firstBono.presupuestoTotal
+                    });
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.modalAccountToggleText,
+                    selectedGasto?.cuenta === 'bonos' && styles.modalAccountToggleTextActive
+                  ]}
+                >
+                  Tarjeta Bonos
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* SELECTOR HORIZONTAL DE RUBRO RÁPIDO */}
+            <Text style={styles.inputFieldLabel}>Cambiar categoría:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryChipsScroll}>
+              {(selectedGasto?.cuenta === 'bonos' ? dashboardData?.bonos.gastos : dashboardData?.nomina.gastos)?.map((g, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.categoryChip,
+                    selectedGasto?.nombre === g.nombre && styles.categoryChipActive
+                  ]}
+                  onPress={() => {
+                    setSelectedGasto({
+                      nombre: g.nombre,
+                      cuenta: selectedGasto?.cuenta || 'nomina',
+                      manejoActual: g.manejoActual,
+                      presupuestoTotal: g.presupuestoTotal
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selectedGasto?.nombre === g.nombre && styles.categoryChipTextActive
+                    ]}
+                  >
+                    {g.nombre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
             {/* ESTADO DE SALDO ACTUAL */}
             <View style={styles.modalBalanceBox}>
@@ -1360,6 +1472,81 @@ const styles = StyleSheet.create({
   modalSubmitBtnText: {
     color: '#06181D',
     fontSize: 15,
+    fontWeight: '700'
+  },
+  modalAccountToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: '#06181D',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  modalAccountToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 9
+  },
+  modalAccountToggleBtnActive: {
+    backgroundColor: '#0F3741'
+  },
+  modalAccountToggleText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  modalAccountToggleTextActive: {
+    color: '#10B981',
+    fontWeight: '700'
+  },
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: 78,
+    right: 18,
+    backgroundColor: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 12,
+    zIndex: 9999
+  },
+  floatingActionText: {
+    color: '#06181D',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  categoryChipsScroll: {
+    marginBottom: 14
+  },
+  categoryChip: {
+    backgroundColor: '#0B2B33',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  categoryChipActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#10B981'
+  },
+  categoryChipText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500'
+  },
+  categoryChipTextActive: {
+    color: '#10B981',
     fontWeight: '700'
   }
 });
