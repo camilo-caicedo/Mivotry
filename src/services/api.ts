@@ -55,6 +55,15 @@ export interface DashboardResponse {
     totalDeudas: number;
     totalAhorros: number;
     totalRendimientos: number;
+    cuotasOccidente?: number;
+    cuotaAdicionalOcc?: number;
+    bolsillo?: number;
+    items?: Array<{
+      nombre: string;
+      valor: number;
+      tipo: 'deuda' | 'ahorro';
+      fila: number;
+    }>;
   };
   pagosAnuales: PagoAnualItem[];
 }

@@ -193,12 +193,24 @@ function getDashboardData() {
   }
   const totalPorCobrar = cleanNumber(sheet.getRange("F29").getValue());
   
-  // H. Bolsillo de Rendimientos & Ahorros (Columna I)
-  const ahorroInversiones = cleanNumber(sheet.getRange("I27").getValue()); // Bolsillo inversiones ($6,800,000)
-  const ahorroPagosAnuales = cleanNumber(sheet.getRange("I28").getValue()); // Ahorro pagos anuales ($1,000,000)
-  const totalCompleto = cleanNumber(sheet.getRange("I30").getValue()); // Total Completo ($7,800,000)
-  const totalDeudasBolsillo = cleanNumber(sheet.getRange("I31").getValue()); // Deudas ($0)
-  const totalAhorrosBolsillo = cleanNumber(sheet.getRange("I32").getValue()); // Ahorros ($7,800,000)
+  // H. Bolsillo de Rendimientos, Ahorros y Deudas (Columnas H e I, filas 25 a 32)
+  const rowsBolsillo = sheet.getRange("H25:I32").getValues();
+  const cuotasOccidente = cleanNumber(rowsBolsillo[0][1]); // H25: Cuotas Occidente, I25
+  const cuotaAdicionalOcc = cleanNumber(rowsBolsillo[1][1]); // H26: Cuota adicional occ, I26
+  const bolsillo = cleanNumber(rowsBolsillo[2][1]); // H27: Bolsillo, I27
+  const ahorroInversiones = cleanNumber(rowsBolsillo[3][1]); // H28: Bolsillo inversiones, I28 ($6,800,000)
+  const ahorroPagosAnuales = cleanNumber(rowsBolsillo[4][1]); // H29: Ahorro pagos anuales, I29 ($1,000,000)
+  const totalCompleto = cleanNumber(rowsBolsillo[5][1]); // H30: Total, I30 ($7,800,000)
+  const totalDeudasBolsillo = cleanNumber(rowsBolsillo[6][1]); // H31: Deudas, I31 ($0)
+  const totalAhorrosBolsillo = cleanNumber(rowsBolsillo[7][1]); // H32: Ahorros, I32 ($7,800,000)
+
+  const detalleBolsillos = [
+    { nombre: "Cuotas Occidente", valor: cuotasOccidente, tipo: "deuda", fila: 25 },
+    { nombre: "Cuota adicional occ", valor: cuotaAdicionalOcc, tipo: "deuda", fila: 26 },
+    { nombre: "Bolsillo", valor: bolsillo, tipo: "ahorro", fila: 27 },
+    { nombre: "Bolsillo inversiones", valor: ahorroInversiones, tipo: "ahorro", fila: 28 },
+    { nombre: "Ahorro pagos anuales", valor: ahorroPagosAnuales, tipo: "ahorro", fila: 29 }
+  ];
   
   // I. Pagos Anuales (Filas 24 a 28, Columnas K a O)
   const rowsAnuales = sheet.getRange("K25:O29").getValues();
@@ -249,12 +261,16 @@ function getDashboardData() {
       totalMensual: totalStreaming
     },
     bolsillos: {
-      inversiones: ahorroInversiones,
-      pagosAnuales: ahorroPagosAnuales,
       totalCompleto: totalCompleto,
       totalDeudas: totalDeudasBolsillo,
       totalAhorros: totalAhorrosBolsillo,
-      totalRendimientos: totalCompleto
+      cuotasOccidente: cuotasOccidente,
+      cuotaAdicionalOcc: cuotaAdicionalOcc,
+      bolsillo: bolsillo,
+      inversiones: ahorroInversiones,
+      pagosAnuales: ahorroPagosAnuales,
+      totalRendimientos: totalCompleto,
+      items: detalleBolsillos
     },
     pagosAnuales: pagosAnuales
   };

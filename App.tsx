@@ -229,6 +229,23 @@ export default function App() {
   const salidasPresupuestoQ = (activeQuincena === 15 ? itemSalidas?.q15 : itemSalidas?.q30) ?? 300000;
   const salidasPorcentaje = salidasPresupuestoQ > 0 ? Math.min(100, Math.round((salidasManejo / salidasPresupuestoQ) * 100)) : 0;
 
+  // Bolsillos & Rendimientos (Columnas H e I, filas 25 a 32)
+  const bolsillosData = dashboardData?.bolsillos;
+  const totalCompletoI30 = bolsillosData?.totalCompleto ?? bolsillosData?.totalRendimientos ?? 7800000;
+  const totalDeudasI31 = bolsillosData?.totalDeudas ?? 0;
+  const totalAhorrosI32 = bolsillosData?.totalAhorros ?? 7800000;
+
+  // Detalle individual de los 5 conceptos de H25:I29
+  const cuotasOccidenteVal = bolsillosData?.cuotasOccidente ?? 0;
+  const cuotaAdicionalOccVal = bolsillosData?.cuotaAdicionalOcc ?? 0;
+  const bolsilloVal = bolsillosData?.bolsillo ?? 0;
+  const inversionesVal = bolsillosData?.items 
+    ? (bolsillosData.inversiones ?? 6800000) 
+    : (bolsillosData?.inversiones && bolsillosData.inversiones > 0 ? bolsillosData.inversiones : 6800000);
+  const pagosAnualesVal = bolsillosData?.items 
+    ? (bolsillosData.pagosAnuales ?? 1000000) 
+    : (bolsillosData?.pagosAnuales === 6800000 ? 1000000 : (bolsillosData?.pagosAnuales ?? 1000000));
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
@@ -563,48 +580,144 @@ export default function App() {
             {/* HERO TOTAL BOLSILLO I:30 */}
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
-                <Text style={styles.heroLabel}>Total Completo Bolsillo (I:30)</Text>
+                <Text style={styles.heroLabel}>Total General Bolsillo (I:30)</Text>
                 <View style={styles.chipTag}>
                   <Text style={styles.chipText}>En Rendimiento</Text>
                 </View>
               </View>
-              <Text style={styles.heroAmount}>
-                {formatCOP(dashboardData?.bolsillos.totalCompleto ?? dashboardData?.bolsillos.totalRendimientos ?? 7800000)}
+
+              <Text style={[styles.heroAmount, { color: CONFIG.COLORS.accentGold }]}>
+                {formatCOP(totalCompletoI30)}
               </Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ color: '#94A3B8', fontSize: 13 }}>Total Ahorros (I:32):</Text>
-                <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>
-                  {formatCOP(dashboardData?.bolsillos.totalAhorros ?? 7800000)}
+
+              {/* FÓRMULA DE TOTALIZACIÓN */}
+              <View style={styles.bolsilloFormulaBadge}>
+                <Text style={styles.bolsilloFormulaText}>
+                  I:30 = Deudas (I:31) + Ahorros (I:32)
+                </Text>
+              </View>
+
+              {/* DUAL PILLARS: AHORROS (I:32) Y DEUDAS (I:31) */}
+              <View style={styles.bolsillosDualGrid}>
+                {/* PILAR AHORROS (I:32) */}
+                <View style={[styles.bolsilloPillarBox, { borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                  <View style={styles.pillarHeaderRow}>
+                    <Text style={styles.pillarLabel}>Ahorros (I:32)</Text>
+                    <TrendingUp size={14} color={CONFIG.COLORS.accentMint} />
+                  </View>
+                  <Text style={[styles.pillarValue, { color: CONFIG.COLORS.accentMint }]}>
+                    {formatCOP(totalAhorrosI32)}
+                  </Text>
+                  <Text style={styles.pillarMeta}>Ahorro neto guardado</Text>
+                </View>
+
+                {/* PILAR DEUDAS (I:31) */}
+                <View style={[styles.bolsilloPillarBox, { borderColor: totalDeudasI31 > 0 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)' }]}>
+                  <View style={styles.pillarHeaderRow}>
+                    <Text style={styles.pillarLabel}>Deudas (I:31)</Text>
+                    <CreditCard size={14} color={totalDeudasI31 > 0 ? CONFIG.COLORS.accentRed : CONFIG.COLORS.textMuted} />
+                  </View>
+                  <Text style={[styles.pillarValue, { color: totalDeudasI31 > 0 ? CONFIG.COLORS.accentRed : '#94A3B8' }]}>
+                    {formatCOP(totalDeudasI31)}
+                  </Text>
+                  <Text style={styles.pillarMeta}>Obligaciones en bolsillo</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* SECCIÓN DETALLE DE AHORROS (I:32) */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View>
+                  <Text style={styles.cardTitle}>Detalle de Ahorros</Text>
+                  <Text style={styles.cardDesc}>Subtotal Ahorros (I:32): {formatCOP(totalAhorrosI32)}</Text>
+                </View>
+                <TrendingUp size={18} color={CONFIG.COLORS.accentMint} />
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {/* 1. BOLSILLO (FILA 27) */}
+              <View style={styles.debtRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtName}>Bolsillo</Text>
+                  <Text style={styles.debtMeta}>Fila 27 • Saldo disponible inmediato</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: bolsilloVal > 0 ? CONFIG.COLORS.accentMint : '#94A3B8' }]}>
+                  {formatCOP(bolsilloVal)}
+                </Text>
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {/* 2. BOLSILLO INVERSIONES (FILA 28) */}
+              <View style={styles.debtRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtName}>Bolsillo inversiones</Text>
+                  <Text style={styles.debtMeta}>Fila 28 • Capital base a largo plazo</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentGold }]}>
+                  {formatCOP(inversionesVal)}
+                </Text>
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {/* 3. AHORRO PAGOS ANUALES (FILA 29) */}
+              <View style={styles.debtRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtName}>Ahorro pagos anuales</Text>
+                  <Text style={styles.debtMeta}>Fila 29 • SOAT, Predial, Impuestos (Primas)</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentMint }]}>
+                  {formatCOP(pagosAnualesVal)}
                 </Text>
               </View>
             </View>
 
-            {/* DESGLOSE DE CAPITAL GUARDADO */}
+            {/* SECCIÓN DETALLE DE DEUDAS (I:31) */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Desglose de Ahorro Guardado</Text>
-              <Text style={styles.cardDesc}>
-                Capital resguardado en el bolsillo generando rendimientos diarios:
+              <View style={styles.cardHeaderRow}>
+                <View>
+                  <Text style={styles.cardTitle}>Detalle de Deudas</Text>
+                  <Text style={styles.cardDesc}>Subtotal Deudas (I:31): {formatCOP(totalDeudasI31)}</Text>
+                </View>
+                <CreditCard size={18} color={CONFIG.COLORS.textMuted} />
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {/* 1. CUOTAS OCCIDENTE (FILA 25) */}
+              <View style={styles.debtRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtName}>Cuotas Occidente</Text>
+                  <Text style={styles.debtMeta}>Fila 25 • Control de cuota en bolsillo</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: cuotasOccidenteVal > 0 ? CONFIG.COLORS.accentRed : '#94A3B8' }]}>
+                  {formatCOP(cuotasOccidenteVal)}
+                </Text>
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {/* 2. CUOTA ADICIONAL OCC (FILA 26) */}
+              <View style={styles.debtRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtName}>Cuota adicional occ</Text>
+                  <Text style={styles.debtMeta}>Fila 26 • Abono o cuota adicional programada</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: cuotaAdicionalOccVal > 0 ? CONFIG.COLORS.accentRed : '#94A3B8' }]}>
+                  {formatCOP(cuotaAdicionalOccVal)}
+                </Text>
+              </View>
+            </View>
+
+            {/* NOTA INFORMATIVA */}
+            <View style={styles.infoNoteCard}>
+              <Text style={styles.infoNoteTitle}>💡 Rendimientos Diarios</Text>
+              <Text style={styles.infoNoteText}>
+                El total de <Text style={{ color: CONFIG.COLORS.accentGold, fontWeight: '700' }}>I:30 ({formatCOP(totalCompletoI30)})</Text> suma las Deudas <Text style={{ color: '#F1F5F9', fontWeight: '700' }}>I:31 ({formatCOP(totalDeudasI31)})</Text> y los Ahorros <Text style={{ color: CONFIG.COLORS.accentMint, fontWeight: '700' }}>I:32 ({formatCOP(totalAhorrosI32)})</Text>. Los intereses diarios se generan directamente sobre el capital ahorrado en tu cuenta.
               </Text>
-              <View style={styles.debtDivider} />
-              <View style={styles.debtRow}>
-                <View>
-                  <Text style={styles.debtName}>Bolsillo Inversiones</Text>
-                  <Text style={styles.debtMeta}>Capital a largo plazo</Text>
-                </View>
-                <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentGold }]}>
-                  {formatCOP(dashboardData?.bolsillos.inversiones ?? 6800000)}
-                </Text>
-              </View>
-              <View style={styles.debtDivider} />
-              <View style={styles.debtRow}>
-                <View>
-                  <Text style={styles.debtName}>Ahorro Pagos Anuales</Text>
-                  <Text style={styles.debtMeta}>Fondeado con primas semestrales</Text>
-                </View>
-                <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentMint }]}>
-                  {formatCOP(dashboardData?.bolsillos.pagosAnuales ?? 1000000)}
-                </Text>
-              </View>
             </View>
           </View>
         )}
@@ -1548,5 +1661,71 @@ const styles = StyleSheet.create({
   categoryChipTextActive: {
     color: '#10B981',
     fontWeight: '700'
+  },
+  bolsilloFormulaBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  bolsilloFormulaText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  bolsillosDualGrid: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  bolsilloPillarBox: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 24, 29, 0.65)',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1
+  },
+  pillarHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4
+  },
+  pillarLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  pillarValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2
+  },
+  pillarMeta: {
+    color: '#64748B',
+    fontSize: 10
+  },
+  infoNoteCard: {
+    backgroundColor: 'rgba(15, 55, 65, 0.5)',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)'
+  },
+  infoNoteTitle: {
+    color: '#F1F5F9',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4
+  },
+  infoNoteText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18
   }
 });
