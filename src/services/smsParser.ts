@@ -3,12 +3,15 @@ export interface ParsedBankSMS {
   entidad: string;
   monto: number;
   comercio: string;
-  tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago';
+  tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' | 'nomina_perficient';
   categoriaSugerida: string;
   cuentaSugerida: 'nomina' | 'bonos';
+  isTarjetaCredito: boolean;
   tarjetaRef?: string;
+  quincenaSugerida?: 15 | 30;
   fechaTexto?: string;
   confianza: 'alta' | 'media';
+  mensajeAccion?: string;
 }
 
 export interface SMSTemplate {
@@ -21,193 +24,256 @@ export interface SMSTemplate {
 
 export const SMS_TEST_TEMPLATES: SMSTemplate[] = [
   {
-    titulo: 'Peoplepass en PriceSmart',
-    banco: 'Peoplepass Paycash',
-    texto: 'Compra aprobada en PRICESMART por $385.000 con Tarjeta Paycash ****8890 el 18/09/2026.',
-    categoriaEsperada: 'Pricesmart',
-    cuentaEsperada: 'bonos'
-  },
-  {
-    titulo: 'Peoplepass Supermercado',
-    banco: 'Peoplepass Paycash',
-    texto: 'Peoplepass: Compra exitosa en FRUVER Y VERDURAS LA 80 por $65.000 con tu tarjeta Paycash.',
-    categoriaEsperada: 'Verduras y demas',
-    cuentaEsperada: 'bonos'
-  },
-  {
-    titulo: 'Peoplepass en Veterinaria / Gatos',
-    banco: 'Peoplepass Paycash',
-    texto: 'Transaccion aprobada en PET SHOP LAIKA por $95.000 con tarjeta Paycash *1122.',
-    categoriaEsperada: 'Gatos',
-    cuentaEsperada: 'bonos'
-  },
-  {
-    titulo: 'Gasolina Texaco (Bancolombia)',
+    titulo: 'Nómina Perficient (Carga Q15)',
     banco: 'Bancolombia',
-    texto: 'Bancolombia le informa compra por $90.000 en EDS TEXACO CALLE 26 con su t.deb *4532, 18/09/2026 08:30.',
-    categoriaEsperada: 'Gasolina/Lavar',
+    texto: 'Bancolombia: Recibiste un pago por $5,049,748.00 de PERFICIENT COLO a tu cuenta AHORROS, el 13:06 a las 15/09/2026. ¿Tienes dudas? Encuentranos aqui:018000931987. Estamos cerca.',
+    categoriaEsperada: 'Nómina Base',
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Salida a Restaurante (Bancolombia)',
+    titulo: 'Peoplepass Starbucks',
+    banco: 'Peoplepass Paycash',
+    texto: 'hora 09:06:05 lugar STARBUCKS JARDIN PLAZA CALI CO 9:06... Peoplepass: COMPRA NACIONAL Aprobada $ 24.265,00 producto 4525160*****7222 fecha 2026-09-18',
+    categoriaEsperada: 'Salidas 1',
+    cuentaEsperada: 'bonos'
+  },
+  {
+    titulo: 'Peoplepass Pyco CC',
+    banco: 'Peoplepass Paycash',
+    texto: 'hora 13:25:06 lugar PYCO CC JARDIN PLAZA CALI CO 1:27 PM Peoplepass: COMPRA NACIONAL Aprobada $ 16.200,00 producto 4525160*****7222 fecha 2026-09-18',
+    categoriaEsperada: 'Salidas 1',
+    cuentaEsperada: 'bonos'
+  },
+  {
+    titulo: 'Dollarcity con TC (*2068)',
     banco: 'Bancolombia',
-    texto: 'Bancolombia le informa compra por $54.000 en CREPES Y WAFFLES con su t.cred *8901, 18/09/2026 14:15.',
+    texto: 'Bancolombia: Compraste COP72.000,00 en DOLLARCITY BOCHALEMA con tu T.Cred *2068, el 10/09/2026 a las 17:43. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
     categoriaEsperada: 'Salidas',
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Compra con Banco de Occidente',
-    banco: 'Banco de Occidente',
-    texto: 'Banco de Occidente informa compra con T.Credito *4567 por $120.000 en CINE COLOMBIA el 18/09/2026.',
+    titulo: 'Celular Claro (COMCEL)',
+    banco: 'Bancolombia',
+    texto: 'Bancolombia: Compraste $61.899,00 en COMCEL PAGOS DE FACT con tu T.Deb *3839, el 15/09/2026 a las 13:44. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
+    categoriaEsperada: 'Celular',
+    cuentaEsperada: 'nomina'
+  },
+  {
+    titulo: 'Davibank Netflix (Visa Oro)',
+    banco: 'DAVIbank',
+    texto: 'DAVIbank : Compra recurrente en NETFLIX por 29,900 con tu tarjeta Visa Oro 2026/09/11 3:04:30',
+    categoriaEsperada: 'Subs',
+    cuentaEsperada: 'nomina'
+  },
+  {
+    titulo: 'Davibank Google WOW',
+    banco: 'DAVIbank',
+    texto: 'DAVIbank : Compra recurrente en GOOGLE *WOW Presents P por 29,900 con tu tarjeta Visa Oro 2026/09/02 17:25:52',
+    categoriaEsperada: 'Subs',
+    cuentaEsperada: 'nomina'
+  },
+  {
+    titulo: 'Transferencia Bre-b',
+    banco: 'Bancolombia',
+    texto: 'Bancolombia: JUAN, transferiste $64,200.00 a la llave 3004412805 desde tu cuenta *1493 a DIANA MARCELA VARGAS MENDEZ el 18/09/26 a las 14:40. Con Bre-b es de una y gratis. Dudas al 018000912345.',
     categoriaEsperada: 'Salidas',
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Compra Rappi / RappiCard',
-    banco: 'RappiCard',
-    texto: 'Aprobamos tu compra en UBER TRIP por $22.500 con tu RappiCard terminada en 4455.',
-    categoriaEsperada: 'Salidas',
+    titulo: 'Pago a Tarjeta Crédito (*2068)',
+    banco: 'Bancolombia',
+    texto: 'Bancolombia: Pagaste $94,304 en la tarjeta de credito *2068 desde la cuenta *1493, el 17/09/2026 21:30. ¿Dudas? Llamanos al 018000912345. Estamos cerca.',
+    categoriaEsperada: 'Deudas tarjetas',
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Pago de Servicios (Davivienda)',
-    banco: 'Davivienda',
-    texto: 'Davivienda: Pago por $115.000 en ENEL CODENSA desde cta *7890 el 18/09/2026 11:20.',
-    categoriaEsperada: 'Servicios',
+    titulo: 'Retiro Fiducuenta',
+    banco: 'Bancolombia',
+    texto: 'Bancolombia: Retiraste $930,000.00 de tu cuenta *9194 Fiducuenta el 2026/09/15 13:37:25, hacia la cuenta *82523741493. ¿Dudas? 6045109009',
+    categoriaEsperada: 'Fiduciaria',
     cuentaEsperada: 'nomina'
   }
 ];
 
+function cleanMoneyValue(rawText: string): number {
+  if (!rawText) return 0;
+  let s = rawText.trim();
+  // Si termina en 2 decimales (ej .00 o ,00)
+  if (/[.,][0-9]{2}$/.test(s)) {
+    s = s.slice(0, -3);
+  }
+  return parseFloat(s.replace(/[^0-9]/g, '')) || 0;
+}
+
 export function parseBankSMS(rawText: string): ParsedBankSMS | null {
   const text = String(rawText || '').trim();
-  if (!text || text.length < 10) return null;
+  if (!text || text.length < 8) return null;
 
-  // 1. Identificación de la Entidad Financiera
+  // 1. CASO ESPECIAL: PAGO DE NÓMINA EMPRESA (PERFICIENT)
+  if (/perficient/i.test(text) && /recibiste|pago|abono/i.test(text)) {
+    const montoMatch = text.match(/(?:\$|COP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)/i);
+    let monto = 5049748;
+    if (montoMatch && montoMatch[1]) {
+      monto = cleanMoneyValue(montoMatch[1]);
+    }
+
+    let quincena: 15 | 30 = 15;
+    const dateMatch = text.match(/([0-3]?[0-9])\/([0-1]?[0-9])\/(?:20)?[0-9]{2}/);
+    if (dateMatch && dateMatch[1]) {
+      const dia = parseInt(dateMatch[1], 10);
+      quincena = dia > 22 ? 30 : 15;
+    }
+
+    return {
+      smsOriginal: text,
+      entidad: 'Perficient Colombia (Nómina)',
+      monto,
+      comercio: 'Perficient Nómina',
+      tipoTransaccion: 'nomina_perficient',
+      categoriaSugerida: 'Nómina Base',
+      cuentaSugerida: 'nomina',
+      isTarjetaCredito: false,
+      quincenaSugerida: quincena,
+      confianza: 'alta',
+      mensajeAccion: `Pago de Nómina de Perficient ($${monto.toLocaleString('es-CO')}). Presiona para cargar la Quincena ${quincena}.`
+    };
+  }
+
+  // 2. IDENTIFICACIÓN DE ENTIDAD FINANCIERA
   let entidad = 'Entidad Bancaria';
   let cuenta: 'nomina' | 'bonos' = 'nomina';
 
   if (/peoplepass|paycash/i.test(text)) {
     entidad = 'Peoplepass Paycash';
     cuenta = 'bonos';
+  } else if (/davibank|davivienda/i.test(text)) {
+    entidad = 'DAVIbank (Davivienda)';
   } else if (/bancolombia/i.test(text)) {
     entidad = 'Bancolombia';
   } else if (/banco\s+de\s+occidente|occidente/i.test(text)) {
     entidad = 'Banco de Occidente';
-  } else if (/davivienda/i.test(text)) {
-    entidad = 'Davivienda';
   } else if (/scotia|colpatria/i.test(text)) {
     entidad = 'Scotiabank Colpatria';
   } else if (/rappi/i.test(text)) {
     entidad = 'RappiCard';
-  } else if (/falabella/i.test(text)) {
-    entidad = 'Banco Falabella';
-  } else if (/nequi/i.test(text)) {
-    entidad = 'Nequi';
-  } else if (/daviplata/i.test(text)) {
-    entidad = 'Daviplata';
   }
 
-  // 2. Extracción del Monto
-  // Patrones: "$ 45.000", "$45,000.00", "por $120.000"
+  // 3. EXTRACCIÓN DEL MONTO
   let monto = 0;
-  const montoMatch = text.match(/\$\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)/);
+  // Busca: $ 16.200,00 | $64,200.00 | COP72.000,00 | $94,304
+  const montoMatch = text.match(/(?:\$|COP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)/i);
   if (montoMatch && montoMatch[1]) {
-    const cleanStr = montoMatch[1].replace(/[^0-9]/g, '');
-    monto = parseFloat(cleanStr) || 0;
+    monto = cleanMoneyValue(montoMatch[1]);
   }
 
   if (monto <= 0) {
-    // Buscar números precedidos de "por " o "de " seguidos de pesos o miles
-    const altMatch = text.match(/(?:por|de|valor)\s+([0-9]{2,3}(?:[.,][0-9]{3})+)/i);
-    if (altMatch && altMatch[1]) {
-      const cleanStr = altMatch[1].replace(/[^0-9]/g, '');
-      monto = parseFloat(cleanStr) || 0;
+    // Buscar "por 29,900" (formato común de Davibank)
+    const porMatch = text.match(/por\s+([0-9]{1,3}(?:[.,][0-9]{3})+)/i);
+    if (porMatch && porMatch[1]) {
+      monto = cleanMoneyValue(porMatch[1]);
     }
   }
 
   if (monto <= 0) return null;
 
-  // 3. Extracción de Comercio / Establecimiento
-  let comercio = 'Comercio General';
-  // Buscar primero "en <COMERCIO>" que es el estándar de compras en Colombia
-  let comercioMatch = text.match(/\ben\s+([A-Za-z0-9\s._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|a\s+las|\*|\.|\$|,))/i);
-  if (!comercioMatch) {
-    // Si no tiene "en", buscar después de "de " evitando nombres de bancos
-    comercioMatch = text.match(/\bde\s+(?!banc|occidente|bogot|davivienda)([A-Za-z0-9\s._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|\*|\.|\$))/i);
-  }
-  if (comercioMatch && comercioMatch[1]) {
-    const candidate = comercioMatch[1].trim();
-    // Evitar falsos positivos como "su cuenta" o palabras de control
-    if (!/^(su\s+t|tu\s+tarjeta|cta|cuenta|tarjeta)/i.test(candidate)) {
-      comercio = candidate;
-    }
-  }
-
-  // 4. Extracción de Referencia de Tarjeta (opcional)
+  // 4. DETECCIÓN DE TARJETA DE CRÉDITO
+  const isTarjetaCredito = /t\.cred|tarjeta de credito|visa oro|rappicard/i.test(text);
   let tarjetaRef: string | undefined = undefined;
-  const cardMatch = text.match(/(?:t\.deb|t\.cred|tarjeta|tc|paycash|cta|terminada\s+en)\s*[*xX\s]*([0-9]{4})/i);
+  const cardMatch = text.match(/(?:t\.cred|t\.deb|tarjeta|producto|cuenta|tarjeta de credito|visa oro)\s*[*xX\s]*([0-9]{4})/i);
   if (cardMatch && cardMatch[1]) {
     tarjetaRef = `*${cardMatch[1]}`;
+  } else if (/visa oro/i.test(text)) {
+    tarjetaRef = 'Visa Oro';
   }
 
-  // 5. Tipo de Transacción
-  let tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago' = 'compra';
-  if (/recarga/i.test(text)) tipoTransaccion = 'recarga';
-  else if (/transferencia|enviaste|env[ií]o/i.test(text)) tipoTransaccion = 'transferencia';
-  else if (/retiro/i.test(text)) tipoTransaccion = 'retiro';
-  else if (/pago\s+de\s+cuota|pago\s+por/i.test(text)) tipoTransaccion = 'pago';
+  // 5. TIPO DE ACCIÓN BANCARIA
+  let tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' = 'compra';
+  if (/pagaste.*tarjeta de credito/i.test(text)) {
+    tipoTransaccion = 'pago_credito';
+  } else if (/transferiste/i.test(text)) {
+    tipoTransaccion = 'transferencia';
+  } else if (/retiraste.*fiducuenta/i.test(text)) {
+    tipoTransaccion = 'retiro';
+  } else if (/recarga/i.test(text)) {
+    tipoTransaccion = 'recarga';
+  }
 
-  // 6. Inferencia Inteligente de Categoría de la Hoja
+  // 6. EXTRACCIÓN DEL COMERCIO / ESTABLECIMIENTO / DESTINO
+  let comercio = 'Comercio General';
+
+  // A) Formato Peoplepass: "lugar STARBUCKS JARDIN PLAZA CALI CO" o "lugar PYCO CC JARDIN PLAZA"
+  const lugarMatch = text.match(/lugar\s+([A-Za-z0-9\s._\-&]{3,35}?)(?:\s+CALI|\s+BOGOTA|\s+[0-9]{1,2}:[0-9]{2}|$)/i);
+  if (lugarMatch && lugarMatch[1]) {
+    comercio = lugarMatch[1].trim();
+  } else if (/transferiste/i.test(text)) {
+    // B) Transferencia Bre-b: "a DIANA MARCELA VARGAS MENDEZ el" o "a Juan Camilo Pantoja Diaz el"
+    const transMatch = text.match(/a\s+([A-Za-z\s]{4,35}?)(?:\s+el|\s+a\s+las|\.|\$)/i);
+    if (transMatch && transMatch[1] && !/la\s+llave/i.test(transMatch[1])) {
+      comercio = transMatch[1].trim();
+    }
+  } else if (text.match(/\ben\s+([A-Za-z0-9*._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|a\s+las|\*|\.|\$|,))/i)) {
+    // C) Compra estándar "en COMERCIO":
+    const enMatch = text.match(/\ben\s+([A-Za-z0-9*._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|a\s+las|\*|\.|\$|,))/i);
+    if (enMatch && enMatch[1]) {
+      const candidate = enMatch[1].trim();
+      if (!/^(la\s+tarjeta|su\s+t|tu\s+tarjeta)/i.test(candidate)) {
+        comercio = candidate;
+      }
+    }
+  } else if (text.match(/a\s+(BANCO\s+[A-Za-z0-9\s]+?)(?:\s+desde|\s+el)/i)) {
+    const bancoMatch = text.match(/a\s+(BANCO\s+[A-Za-z0-9\s]+?)(?:\s+desde|\s+el)/i);
+    if (bancoMatch && bancoMatch[1]) {
+      comercio = bancoMatch[1].trim();
+    }
+  }
+
+  // 7. INFERENCIA INTELIGENTE DE CATEGORÍA DE LA HOJA
   const cLower = `${comercio} ${text}`.toLowerCase();
-  let categoriaSugerida = 'Salidas'; // Categoría por defecto para compras variables
+  let categoriaSugerida = 'Salidas';
   let confianza: 'alta' | 'media' = 'media';
 
-  // Reglas específicas para Bonos Peoplepass
-  if (cuenta === 'bonos') {
-    if (/pricesmart/i.test(cLower)) {
-      categoriaSugerida = 'Pricesmart';
-      confianza = 'alta';
-    } else if (/olimpica|exito|éxito|carulla|d1|ara|jumbo|fruver|verdura|mercado|supermercado/i.test(cLower)) {
-      categoriaSugerida = 'Verduras y demas';
-      confianza = 'alta';
-    } else if (/veterin|pet|gato|laika|agrocampo|purina|cat/i.test(cLower)) {
-      categoriaSugerida = 'Gatos';
-      confianza = 'alta';
-    } else {
-      categoriaSugerida = 'Salidas 1';
-    }
-  } else {
-    // Reglas para Nómina
-    if (/texaco|primax|terpel|esso|mobil|biomax|gasolin|combustible|lavadero|lavar|estacion/i.test(cLower)) {
-      categoriaSugerida = 'Gasolina/Lavar';
-      confianza = 'alta';
-    } else if (/pricesmart/i.test(cLower)) {
-      // Si fue con tarjeta de crédito/débito pero es PriceSmart
-      categoriaSugerida = 'Pricesmart';
-      cuenta = 'bonos'; // Sugerir bonos si fue ahí
-      confianza = 'media';
-    } else if (/enel|codensa|vanti|gas\s+natural|acueducto|epm|energia|servicios\s+publicos/i.test(cLower)) {
-      categoriaSugerida = 'Servicios';
-      confianza = 'alta';
-    } else if (/claro|movistar|tigo|wom|celular/i.test(cLower)) {
-      categoriaSugerida = 'Celular';
-      confianza = 'alta';
-    } else if (/etb|internet/i.test(cLower)) {
-      categoriaSugerida = 'Internet';
-      confianza = 'alta';
-    } else if (/netflix|spotify|youtube|disney|prime\s*video|hbo|max|crunchy|apple\s*sub/i.test(cLower)) {
-      categoriaSugerida = 'Subs';
-      confianza = 'alta';
-    } else if (/rappi/i.test(cLower) && !/rappicard/i.test(comercio.toLowerCase())) {
-      categoriaSugerida = 'Rappi';
-      confianza = 'alta';
-    } else if (/allianz|sura|seguro|soat/i.test(cLower)) {
-      categoriaSugerida = 'Seguro carro';
-      confianza = 'media';
-    } else if (/restaurante|cafe|cafeteria|bar|cine|crepes|waffles|mcdonalds|burguer|starbucks|domicilio|uber|didi|cabify/i.test(cLower)) {
-      categoriaSugerida = 'Salidas';
-      confianza = 'alta';
-    }
+  if (tipoTransaccion === 'retiro' && /fiducuenta/i.test(cLower)) {
+    categoriaSugerida = 'Fiduciaria';
+    confianza = 'alta';
+  } else if (tipoTransaccion === 'pago_credito') {
+    categoriaSugerida = 'Deudas tarjetas';
+    confianza = 'alta';
+  } else if (/comcel|claro/i.test(cLower)) {
+    categoriaSugerida = 'Celular';
+    confianza = 'alta';
+  } else if (/netflix|wow\s*presents|spotify|disney|prime|youtube|crunchy|apple/i.test(cLower)) {
+    categoriaSugerida = 'Subs';
+    confianza = 'alta';
+  } else if (/pricesmart/i.test(cLower)) {
+    categoriaSugerida = 'Pricesmart';
+    cuenta = 'bonos';
+    confianza = 'alta';
+  } else if (/fruver|verdura|exito|éxito|carulla|d1|ara|jumbo|supermercado/i.test(cLower)) {
+    categoriaSugerida = 'Verduras y demas';
+    cuenta = 'bonos';
+    confianza = 'alta';
+  } else if (/laika|pet|gato|veterin|purina|agrocampo/i.test(cLower)) {
+    categoriaSugerida = 'Gatos';
+    cuenta = 'bonos';
+    confianza = 'alta';
+  } else if (cuenta === 'bonos') {
+    // Compras de bonos en Starbucks, Pyco, restaurantes de centro comercial
+    categoriaSugerida = 'Salidas 1';
+    confianza = 'alta';
+  } else if (/texaco|primax|terpel|esso|mobil|gasol|lavadero/i.test(cLower)) {
+    categoriaSugerida = 'Gasolina/Lavar';
+    confianza = 'alta';
+  } else if (/enel|codensa|vanti|acueducto|epm|energia|servicios/i.test(cLower)) {
+    categoriaSugerida = 'Servicios';
+    confianza = 'alta';
+  } else if (/dollarcity|h60|starbucks|pyco|cine|crepes|restaurante|uber|didi|bar/i.test(cLower)) {
+    categoriaSugerida = 'Salidas';
+    confianza = 'alta';
+  }
+
+  let mensajeAccion = undefined;
+  if (isTarjetaCredito) {
+    mensajeAccion = `💳 Compra con Tarjeta de Crédito (${tarjetaRef || 'TC'}): Se descontará de ${categoriaSugerida} y se sumará a la Deuda de Tarjetas.`;
   }
 
   return {
@@ -218,7 +284,9 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     tipoTransaccion,
     categoriaSugerida,
     cuentaSugerida: cuenta,
+    isTarjetaCredito,
     tarjetaRef,
-    confianza
+    confianza,
+    mensajeAccion
   };
 }

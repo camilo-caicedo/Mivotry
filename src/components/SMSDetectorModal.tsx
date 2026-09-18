@@ -81,24 +81,54 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
     analyzeText(template.texto);
   };
 
-  // Registrar el gasto en Google Sheets
+  // Registrar el gasto o cargar nómina en Google Sheets
   const handleConfirmGasto = async () => {
     if (!parsedResult || parsedResult.monto <= 0) return;
 
     try {
       setSubmitting(true);
+
+      // CASO ESPECIAL: PAGO DE NÓMINA PERFICIENT
+      if (parsedResult.tipoTransaccion === 'nomina_perficient') {
+        const q = parsedResult.quincenaSugerida || 15;
+        await MivotryAPI.cargarQuincena(q);
+        setSubmitting(false);
+        Alert.alert(
+          '¡Quincena Iniciada!',
+          `Se cargó exitosamente la Quincena ${q} por el pago de nómina de Perficient (${formatCOP(parsedResult.monto)}). Tu presupuesto de Nómina ha sido actualizado.`,
+          [
+            {
+              text: 'Genial',
+              onPress: () => {
+                setInputText('');
+                setParsedResult(null);
+                onGastoRegistrado();
+                onClose();
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // CASO GASTO REGULAR O COMPRA CON TARJETA
+      const conceptoFinal = parsedResult.isTarjetaCredito
+        ? `${customConcepto || parsedResult.comercio} (TC ${parsedResult.tarjetaRef || ''})`.trim()
+        : (customConcepto || parsedResult.comercio);
+
       const res = await MivotryAPI.registrarGasto({
         cuenta: selectedCuenta,
         categoria: selectedCategoria,
         monto: parsedResult.monto,
-        concepto: customConcepto || parsedResult.comercio,
+        concepto: conceptoFinal,
         origen: 'sms'
       });
 
       setSubmitting(false);
+      const tcMsg = parsedResult.isTarjetaCredito ? ' y registrado como consumo de Tarjeta de Crédito' : '';
       Alert.alert(
         '¡Gasto Registrado!',
-        `Se descontaron ${formatCOP(parsedResult.monto)} de ${selectedCategoria} (${selectedCuenta === 'bonos' ? 'Bonos' : 'Nómina'}). Saldo restante: ${formatCOP(res.nuevoSaldoManejo)}.`,
+        `Se descontaron ${formatCOP(parsedResult.monto)} de ${selectedCategoria} (${selectedCuenta === 'bonos' ? 'Bonos' : 'Nómina'})${tcMsg}. Saldo restante: ${formatCOP(res.nuevoSaldoManejo)}.`,
         [
           {
             text: 'Excelente',
@@ -217,8 +247,51 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
 
                 <View style={styles.resultDivider} />
 
-                {/* SELECTOR DE CUENTA NÓMINA VS BONOS */}
-                <Text style={styles.fieldLabelSmall}>Cuenta de origen:</Text>
+                {/* CASO ESPECIAL: PAGO DE NÓMINA DE PERFICIENT */}
+                {parsedResult.tipoTransaccion === 'nomina_perficient' ? (
+                  <View style={styles.perficientBox}>
+                    <View style={styles.perficientHeaderRow}>
+                      <Text style={styles.perficientBadge}>💼 Empresa Perficient</Text>
+                      <Text style={styles.perficientQBadge}>Quincena {parsedResult.quincenaSugerida}</Text>
+                    </View>
+                    <Text style={styles.perficientTitle}>Pago de Nómina Detectado</Text>
+                    <Text style={styles.perficientDesc}>
+                      {parsedResult.mensajeAccion || `Abono de Perficient por ${formatCOP(parsedResult.monto)}.`}
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.perficientBtn}
+                      disabled={submitting}
+                      onPress={handleConfirmGasto}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator size="small" color="#06181D" />
+                      ) : (
+                        <Text style={styles.perficientBtnText}>
+                          🚀 Iniciar y Cargar Quincena {parsedResult.quincenaSugerida}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                    {/* AVISO SI ES TARJETA DE CRÉDITO */}
+                    {parsedResult.isTarjetaCredito && (
+                      <View style={styles.tcNoticeBox}>
+                        <CreditCard size={16} color="#F59E0B" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.tcNoticeTitle}>
+                            Compra con Tarjeta de Crédito ({parsedResult.tarjetaRef || 'TC'})
+                          </Text>
+                          <Text style={styles.tcNoticeDesc}>
+                            Se descontará de {selectedCategoria} en Manejo y sumará a la Deuda de Tarjetas.
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* SELECTOR DE CUENTA NÓMINA VS BONOS */}
+                    <Text style={styles.fieldLabelSmall}>Cuenta de origen:</Text>
                 <View style={styles.accountToggleRow}>
                   <TouchableOpacity
                     style={[
@@ -307,6 +380,8 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
                     </View>
                   )}
                 </TouchableOpacity>
+                  </>
+                )}
               </View>
             ) : inputText.trim().length > 10 ? (
               <View style={styles.noResultBox}>
@@ -584,5 +659,77 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
     lineHeight: 18
+  },
+  tcNoticeBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)'
+  },
+  tcNoticeTitle: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  tcNoticeDesc: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    marginTop: 2
+  },
+  perficientBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  perficientHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  perficientBadge: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  perficientQBadge: {
+    backgroundColor: '#10B981',
+    color: '#06181D',
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  perficientTitle: {
+    color: '#F1F5F9',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 6
+  },
+  perficientDesc: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 16
+  },
+  perficientBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  perficientBtnText: {
+    color: '#06181D',
+    fontSize: 14,
+    fontWeight: '800'
   }
 });
