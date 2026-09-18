@@ -34,13 +34,16 @@ import {
   Utensils,
   X,
   Plus,
-  ChevronDown
+  ChevronDown,
+  Smartphone,
+  ArrowRight
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CONFIG } from './src/config';
 import { MivotryAPI, DashboardResponse, GastoItem } from './src/services/api';
 import { ChatAssistant } from './src/components/ChatAssistant';
+import { SMSDetectorModal } from './src/components/SMSDetectorModal';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +66,7 @@ export default function App() {
   const [montoInput, setMontoInput] = useState('');
   const [conceptoInput, setConceptoInput] = useState('');
   const [submittingExpense, setSubmittingExpense] = useState(false);
+  const [smsModalVisible, setSmsModalVisible] = useState(false);
 
   const fetchDashboard = async () => {
     try {
@@ -267,7 +271,10 @@ export default function App() {
           <TouchableOpacity style={styles.iconButton} onPress={onRefresh}>
             <RefreshCw size={19} color={CONFIG.COLORS.textLight} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => setSmsModalVisible(true)}
+          >
             <Bell size={19} color={CONFIG.COLORS.textLight} />
             <View style={styles.badgeNotification} />
           </TouchableOpacity>
@@ -410,6 +417,29 @@ export default function App() {
                 💡 Registra salidas escribiendo en el chat: "Gasté 35k en restaurante"
               </Text>
             </View>
+
+            {/* TARJETA ACCESO RÁPIDO: DETECTOR DE SMS BANCARIOS */}
+            <TouchableOpacity
+              style={styles.smsShortcutCard}
+              activeOpacity={0.85}
+              onPress={() => setSmsModalVisible(true)}
+            >
+              <View style={styles.smsShortcutLeft}>
+                <View style={styles.smsShortcutIconBox}>
+                  <Smartphone size={18} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.smsShortcutTitle}>Detector de SMS Bancarios</Text>
+                  <Text style={styles.smsShortcutSubtitle}>
+                    Peoplepass, Occidente, Bancolombia, Rappi
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.smsShortcutBadge}>
+                <Text style={styles.smsShortcutBadgeText}>1-Tap</Text>
+                <ArrowRight size={13} color="#10B981" />
+              </View>
+            </TouchableOpacity>
 
             {/* SECCIÓN BOLSILLOS & FLOAT EN VIVO */}
             <View style={styles.sectionHeaderRow}>
@@ -932,6 +962,14 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL DETECTOR DE SMS BANCARIOS */}
+      <SMSDetectorModal
+        visible={smsModalVisible}
+        onClose={() => setSmsModalVisible(false)}
+        dashboardData={dashboardData}
+        onGastoRegistrado={fetchDashboard}
+      />
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -1727,5 +1765,56 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     lineHeight: 18
+  },
+  smsShortcutCard: {
+    backgroundColor: '#0F3741',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  smsShortcutLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1
+  },
+  smsShortcutIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  smsShortcutTitle: {
+    color: '#F1F5F9',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  smsShortcutSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2
+  },
+  smsShortcutBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  smsShortcutBadgeText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700'
   }
 });

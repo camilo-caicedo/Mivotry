@@ -15,7 +15,11 @@
         "foregroundImage": "./assets/icon.png"
       },
       "package": "com.mivotry.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "RECEIVE_SMS",
+        "READ_SMS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
