@@ -43,7 +43,7 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
   const [inputText, setInputText] = useState('');
   const [parsedResult, setParsedResult] = useState<ParsedBankSMS | null>(null);
   const [selectedCategoria, setSelectedCategoria] = useState('');
-  const [selectedCuenta, setSelectedCuenta] = useState<'nomina' | 'bonos'>('nomina');
+  const [selectedCuenta, setSelectedCuenta] = useState<'nomina' | 'bonos' | 'tarjeta_credito'>('nomina');
   const [customConcepto, setCustomConcepto] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -111,24 +111,67 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
         return;
       }
 
-      // CASO GASTO REGULAR O COMPRA CON TARJETA
+      // CASO COMPRA CON TARJETA DE CRÉDITO (T.Cred)
+      if (parsedResult.isTarjetaCredito && parsedResult.tipoTransaccion === 'compra_tc') {
+        const tarjeta = parsedResult.tarjetaNombre || 'Infinity';
+        const filaTC = tarjeta.toLowerCase().includes('infinity') ? 8 : (tarjeta.toLowerCase().includes('rappi') ? 9 : (tarjeta.toLowerCase().includes('scotia') ? 10 : 11));
+        const conceptoFinal = `${customConcepto || parsedResult.comercio} (TC ${parsedResult.tarjetaRef || ''})`.trim();
+
+        await MivotryAPI.actualizarSaldoTarjetaCredito({
+          tarjeta: tarjeta,
+          fila: filaTC,
+          monto: parsedResult.monto,
+          operacion: 'sumar',
+          concepto: `Consumo TC ${tarjeta}: ${conceptoFinal}`
+        });
+
+        setSubmitting(false);
+        Alert.alert(
+          '¡Consumo en Tarjeta de Crédito!',
+          `Se sumaron ${formatCOP(parsedResult.monto)} a la deuda de tu tarjeta ${tarjeta} (${parsedResult.tarjetaRef || ''}) en la celda I${filaTC}.\n\n🛡️ No se descontó de tu cuenta de ahorros de Manejo.`,
+          [
+            {
+              text: 'Entendido',
+              onPress: () => {
+                setInputText('');
+                setParsedResult(null);
+                onGastoRegistrado();
+                onClose();
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // CASO GASTO REGULAR O PAGO DE TARJETA
       const conceptoFinal = parsedResult.isTarjetaCredito
         ? `${customConcepto || parsedResult.comercio} (TC ${parsedResult.tarjetaRef || ''})`.trim()
         : (customConcepto || parsedResult.comercio);
 
       const res = await MivotryAPI.registrarGasto({
-        cuenta: selectedCuenta,
+        cuenta: selectedCuenta === 'bonos' ? 'bonos' : 'nomina',
         categoria: selectedCategoria,
         monto: parsedResult.monto,
         concepto: conceptoFinal,
         origen: 'sms'
       });
 
+      // Si fue un pago a la tarjeta de crédito desde la cuenta, descontar también de la deuda de la tarjeta
+      if (parsedResult.tipoTransaccion === 'pago_credito') {
+        const tarjeta = parsedResult.tarjetaNombre || 'Infinity';
+        await MivotryAPI.actualizarSaldoTarjetaCredito({
+          tarjeta: tarjeta,
+          monto: parsedResult.monto,
+          operacion: 'restar',
+          concepto: `Abono/Pago a TC ${tarjeta}`
+        });
+      }
+
       setSubmitting(false);
-      const tcMsg = parsedResult.isTarjetaCredito ? ' y registrado como consumo de Tarjeta de Crédito' : '';
       Alert.alert(
         '¡Gasto Registrado!',
-        `Se descontaron ${formatCOP(parsedResult.monto)} de ${selectedCategoria} (${selectedCuenta === 'bonos' ? 'Bonos' : 'Nómina'})${tcMsg}. Saldo restante: ${formatCOP(res.nuevoSaldoManejo)}.`,
+        `Se descontaron ${formatCOP(parsedResult.monto)} de ${selectedCategoria} (${selectedCuenta === 'bonos' ? 'Bonos' : 'Nómina'}). Saldo restante: ${formatCOP(res.nuevoSaldoManejo)}.`,
         [
           {
             text: 'Excelente',
@@ -278,108 +321,117 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
                     {/* AVISO SI ES TARJETA DE CRÉDITO */}
                     {parsedResult.isTarjetaCredito && (
                       <View style={styles.tcNoticeBox}>
-                        <CreditCard size={16} color="#F59E0B" />
+                        <CreditCard size={18} color="#F59E0B" />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.tcNoticeTitle}>
-                            Compra con Tarjeta de Crédito ({parsedResult.tarjetaRef || 'TC'})
+                            Tarjeta de Crédito {parsedResult.tarjetaNombre || 'Infinity'} ({parsedResult.tarjetaRef || 'TC'})
                           </Text>
                           <Text style={styles.tcNoticeDesc}>
-                            Se descontará de {selectedCategoria} en Manejo y sumará a la Deuda de Tarjetas.
+                            {parsedResult.tipoTransaccion === 'compra_tc'
+                              ? `Suma ${formatCOP(parsedResult.monto)} a tu deuda en la celda I8 y NO descuenta de tu saldo de Manejo.`
+                              : `Pago a tarjeta: Se descuenta de tu saldo de Manejo y disminuye la deuda.`}
                           </Text>
                         </View>
                       </View>
                     )}
 
-                    {/* SELECTOR DE CUENTA NÓMINA VS BONOS */}
-                    <Text style={styles.fieldLabelSmall}>Cuenta de origen:</Text>
-                <View style={styles.accountToggleRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.accountToggleBtn,
-                      selectedCuenta === 'nomina' && styles.accountToggleBtnActive
-                    ]}
-                    onPress={() => setSelectedCuenta('nomina')}
-                  >
-                    <Text
-                      style={[
-                        styles.accountToggleText,
-                        selectedCuenta === 'nomina' && styles.accountToggleTextActive
-                      ]}
-                    >
-                      Sueldo Nómina
-                    </Text>
-                  </TouchableOpacity>
+                    {/* SI NO ES COMPRA CON TC, MOSTRAR SELECTORES DE CUENTA Y CATEGORÍA */}
+                    {parsedResult.tipoTransaccion !== 'compra_tc' && (
+                      <>
+                        {/* SELECTOR DE CUENTA NÓMINA VS BONOS */}
+                        <Text style={styles.fieldLabelSmall}>Cuenta de origen:</Text>
+                        <View style={styles.accountToggleRow}>
+                          <TouchableOpacity
+                            style={[
+                              styles.accountToggleBtn,
+                              selectedCuenta === 'nomina' && styles.accountToggleBtnActive
+                            ]}
+                            onPress={() => setSelectedCuenta('nomina')}
+                          >
+                            <Text
+                              style={[
+                                styles.accountToggleText,
+                                selectedCuenta === 'nomina' && styles.accountToggleTextActive
+                              ]}
+                            >
+                              Sueldo Nómina
+                            </Text>
+                          </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.accountToggleBtn,
-                      selectedCuenta === 'bonos' && styles.accountToggleBtnActive
-                    ]}
-                    onPress={() => setSelectedCuenta('bonos')}
-                  >
-                    <Text
-                      style={[
-                        styles.accountToggleText,
-                        selectedCuenta === 'bonos' && styles.accountToggleTextActive
-                      ]}
-                    >
-                      Tarjeta Bonos ($1.6M)
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.accountToggleBtn,
+                              selectedCuenta === 'bonos' && styles.accountToggleBtnActive
+                            ]}
+                            onPress={() => setSelectedCuenta('bonos')}
+                          >
+                            <Text
+                              style={[
+                                styles.accountToggleText,
+                                selectedCuenta === 'bonos' && styles.accountToggleTextActive
+                              ]}
+                            >
+                              Tarjeta Bonos ($1.6M)
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
 
-                {/* SELECTOR DE CATEGORÍA DE HOJA */}
-                <Text style={styles.fieldLabelSmall}>Categoría asignada en hoja:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryChipsScroll}>
-                  {categoriasDisponibles.map((cat, idx) => (
+                        {/* SELECTOR DE CATEGORÍA DE HOJA */}
+                        <Text style={styles.fieldLabelSmall}>Categoría asignada en hoja:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryChipsScroll}>
+                          {categoriasDisponibles.map((cat, idx) => (
+                            <TouchableOpacity
+                              key={idx}
+                              style={[
+                                styles.catChip,
+                                selectedCategoria === cat.nombre && styles.catChipActive
+                              ]}
+                              onPress={() => setSelectedCategoria(cat.nombre)}
+                            >
+                              <Text
+                                style={[
+                                  styles.catChipText,
+                                  selectedCategoria === cat.nombre && styles.catChipTextActive
+                                ]}
+                              >
+                                {cat.nombre}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </>
+                    )}
+
+                    {/* CONCEPTO DETALLE */}
+                    <Text style={styles.fieldLabelSmall}>Concepto o detalle a registrar:</Text>
+                    <TextInput
+                      style={styles.conceptoInput}
+                      value={customConcepto}
+                      onChangeText={setCustomConcepto}
+                      placeholder="Detalle del gasto"
+                      placeholderTextColor="#64748B"
+                    />
+
+                    {/* BOTÓN CONFIRMAR EN GOOGLE SHEETS */}
                     <TouchableOpacity
-                      key={idx}
-                      style={[
-                        styles.catChip,
-                        selectedCategoria === cat.nombre && styles.catChipActive
-                      ]}
-                      onPress={() => setSelectedCategoria(cat.nombre)}
+                      style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
+                      activeOpacity={0.85}
+                      disabled={submitting}
+                      onPress={handleConfirmGasto}
                     >
-                      <Text
-                        style={[
-                          styles.catChipText,
-                          selectedCategoria === cat.nombre && styles.catChipTextActive
-                        ]}
-                      >
-                        {cat.nombre}
-                      </Text>
+                      {submitting ? (
+                        <ActivityIndicator size="small" color="#06181D" />
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <CheckCircle2 size={18} color="#06181D" />
+                          <Text style={styles.confirmBtnText}>
+                            {parsedResult.tipoTransaccion === 'compra_tc'
+                              ? `Sumar a Deuda ${parsedResult.tarjetaNombre || 'Infinity'} (${formatCOP(parsedResult.monto)})`
+                              : `Registrar ${formatCOP(parsedResult.monto)} en Sheets`}
+                          </Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                {/* CONCEPTO DETALLE */}
-                <Text style={styles.fieldLabelSmall}>Concepto o detalle a registrar:</Text>
-                <TextInput
-                  style={styles.conceptoInput}
-                  value={customConcepto}
-                  onChangeText={setCustomConcepto}
-                  placeholder="Detalle del gasto"
-                  placeholderTextColor="#64748B"
-                />
-
-                {/* BOTÓN CONFIRMAR EN GOOGLE SHEETS */}
-                <TouchableOpacity
-                  style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
-                  activeOpacity={0.85}
-                  disabled={submitting}
-                  onPress={handleConfirmGasto}
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#06181D" />
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <CheckCircle2 size={18} color="#06181D" />
-                      <Text style={styles.confirmBtnText}>
-                        Registrar {formatCOP(parsedResult.monto)} en Sheets
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
                   </>
                 )}
               </View>

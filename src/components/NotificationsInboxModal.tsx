@@ -88,14 +88,15 @@ export const NotificationsInboxModal: React.FC<Props> = ({
   const handleAprobarItem = async (item: NotificacionPendienteItem) => {
     try {
       setProcessingId(item.id);
-      const cat = selectedCategories[item.id] || item.categoriaSugerida || 'Salidas 1';
-      const acc = selectedAccounts[item.id] || (item.cuentaSugerida as 'nomina' | 'bonos') || 'nomina';
+      const isTC = item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
+      const cat = isTC ? 'Deudas tarjetas' : (selectedCategories[item.id] || item.categoriaSugerida || 'Salidas 1');
+      const acc = isTC ? 'tarjeta_credito' : (selectedAccounts[item.id] || (item.cuentaSugerida as 'nomina' | 'bonos') || 'nomina');
 
       const res = await MivotryAPI.procesarNotificacionPendiente({
         id: item.id,
         accion: 'aprobar',
         categoria: cat,
-        cuenta: acc,
+        cuenta: acc as any,
         monto: item.monto,
         concepto: item.comercio || `Gasto ${item.entidad}`
       });
@@ -385,6 +386,8 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                 const currentCat = selectedCategories[item.id] || item.categoriaSugerida || 'Salidas 1';
                 const currentAcc = selectedAccounts[item.id] || (item.cuentaSugerida as 'nomina' | 'bonos') || 'nomina';
 
+                const isItemTC = item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
+
                 return (
                   <View key={item.id} style={styles.itemCard}>
                     {/* ENCABEZADO DE TARJETA */}
@@ -416,44 +419,59 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                         </Text>
                       </View>
 
-                      {/* SELECTOR CUENTA */}
-                      <View style={styles.accountPillBox}>
-                        <TouchableOpacity
-                          style={[styles.accountPill, currentAcc === 'nomina' && styles.accountPillActive]}
-                          onPress={() => setSelectedAccounts(prev => ({ ...prev, [item.id]: 'nomina' }))}
-                        >
-                          <Text style={[styles.accountPillText, currentAcc === 'nomina' && styles.accountPillTextActive]}>
-                            Nómina
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.accountPill, currentAcc === 'bonos' && styles.accountPillActive]}
-                          onPress={() => setSelectedAccounts(prev => ({ ...prev, [item.id]: 'bonos' }))}
-                        >
-                          <Text style={[styles.accountPillText, currentAcc === 'bonos' && styles.accountPillTextActive]}>
-                            Bonos
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* SELECTOR RÁPIDO DE CATEGORÍA */}
-                    <View style={styles.categorySelectRow}>
-                      <Text style={styles.catLabel}>Categoría:</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                        {['Salidas 1', 'Salidas 2', 'Subs', 'Comida', 'Gatos', 'Fondo Ocasional'].map(c => (
+                      {/* SELECTOR CUENTA O BADGE DE TARJETA */}
+                      {isItemTC ? (
+                        <View style={styles.tcBadgeBox}>
+                          <CreditCard size={13} color="#F59E0B" />
+                          <Text style={styles.tcBadgeText}>Tarjeta Infinity</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.accountPillBox}>
                           <TouchableOpacity
-                            key={c}
-                            style={[styles.catChip, currentCat === c && styles.catChipActive]}
-                            onPress={() => setSelectedCategories(prev => ({ ...prev, [item.id]: c }))}
+                            style={[styles.accountPill, currentAcc === 'nomina' && styles.accountPillActive]}
+                            onPress={() => setSelectedAccounts(prev => ({ ...prev, [item.id]: 'nomina' }))}
                           >
-                            <Text style={[styles.catChipText, currentCat === c && styles.catChipTextActive]}>
-                              {c}
+                            <Text style={[styles.accountPillText, currentAcc === 'nomina' && styles.accountPillTextActive]}>
+                              Nómina
                             </Text>
                           </TouchableOpacity>
-                        ))}
-                      </ScrollView>
+                          <TouchableOpacity
+                            style={[styles.accountPill, currentAcc === 'bonos' && styles.accountPillActive]}
+                            onPress={() => setSelectedAccounts(prev => ({ ...prev, [item.id]: 'bonos' }))}
+                          >
+                            <Text style={[styles.accountPillText, currentAcc === 'bonos' && styles.accountPillTextActive]}>
+                              Bonos
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
+
+                    {/* SELECTOR RÁPIDO DE CATEGORÍA O AVISO TC */}
+                    {isItemTC ? (
+                      <View style={styles.tcNoticeRow}>
+                        <Text style={styles.tcNoticeRowText}>
+                          🛡️ Suma a Deuda en celda I8 (Fila 8). No descuenta de Manejo.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.categorySelectRow}>
+                        <Text style={styles.catLabel}>Categoría:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                          {['Salidas 1', 'Salidas 2', 'Subs', 'Comida', 'Gatos', 'Fondo Ocasional'].map(c => (
+                            <TouchableOpacity
+                              key={c}
+                              style={[styles.catChip, currentCat === c && styles.catChipActive]}
+                              onPress={() => setSelectedCategories(prev => ({ ...prev, [item.id]: c }))}
+                            >
+                              <Text style={[styles.catChipText, currentCat === c && styles.catChipTextActive]}>
+                                {c}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
 
                     {/* TEXTO ORIGINAL COLAPSABLE */}
                     {isExpanded && (
@@ -908,5 +926,35 @@ const styles = StyleSheet.create({
     color: '#06181D',
     fontSize: 11,
     fontWeight: '800'
+  },
+  tcBadgeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)'
+  },
+  tcBadgeText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  tcNoticeRow: {
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)'
+  },
+  tcNoticeRowText: {
+    color: '#FCD34D',
+    fontSize: 11,
+    fontWeight: '600'
   }
 });

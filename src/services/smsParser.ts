@@ -3,11 +3,12 @@ export interface ParsedBankSMS {
   entidad: string;
   monto: number;
   comercio: string;
-  tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' | 'nomina_perficient';
+  tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' | 'nomina_perficient' | 'compra_tc';
   categoriaSugerida: string;
-  cuentaSugerida: 'nomina' | 'bonos';
+  cuentaSugerida: 'nomina' | 'bonos' | 'tarjeta_credito';
   isTarjetaCredito: boolean;
   tarjetaRef?: string;
+  tarjetaNombre?: string;
   quincenaSugerida?: 15 | 30;
   fechaTexto?: string;
   confianza: 'alta' | 'media';
@@ -141,7 +142,7 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
 
   // 2. IDENTIFICACIÓN DE ENTIDAD FINANCIERA
   let entidad = 'Entidad Bancaria';
-  let cuenta: 'nomina' | 'bonos' = 'nomina';
+  let cuenta: 'nomina' | 'bonos' | 'tarjeta_credito' = 'nomina';
 
   if (/peoplepass|paycash/i.test(text)) {
     entidad = 'Peoplepass Paycash';
@@ -179,15 +180,25 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
   // 4. DETECCIÓN DE TARJETA DE CRÉDITO
   const isTarjetaCredito = /t\.cred|tarjeta de credito|visa oro|rappicard/i.test(text);
   let tarjetaRef: string | undefined = undefined;
+  let tarjetaNombre = 'Tarjeta de Crédito';
   const cardMatch = text.match(/(?:t\.cred|t\.deb|tarjeta|producto|cuenta|tarjeta de credito|visa oro)\s*[*xX\s]*([0-9]{4})/i);
   if (cardMatch && cardMatch[1]) {
     tarjetaRef = `*${cardMatch[1]}`;
+    if (cardMatch[1] === '2068') {
+      tarjetaNombre = 'Infinity';
+    }
   } else if (/visa oro/i.test(text)) {
     tarjetaRef = 'Visa Oro';
   }
 
+  if (/infinity/i.test(text)) tarjetaNombre = 'Infinity';
+  else if (/rappi/i.test(text)) tarjetaNombre = 'Rappi';
+  else if (/scotia|colpatria/i.test(text)) tarjetaNombre = 'Scotia';
+  else if (/falabella/i.test(text)) tarjetaNombre = 'Falabella';
+  else if (isTarjetaCredito && /bancolombia/i.test(text)) tarjetaNombre = 'Infinity';
+
   // 5. TIPO DE ACCIÓN BANCARIA
-  let tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' = 'compra';
+  let tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' | 'compra_tc' = 'compra';
   if (/pagaste.*tarjeta de credito/i.test(text)) {
     tipoTransaccion = 'pago_credito';
   } else if (/transferiste/i.test(text)) {
@@ -196,6 +207,8 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     tipoTransaccion = 'retiro';
   } else if (/recarga/i.test(text)) {
     tipoTransaccion = 'recarga';
+  } else if (isTarjetaCredito) {
+    tipoTransaccion = 'compra_tc';
   }
 
   // 6. EXTRACCIÓN DEL COMERCIO / ESTABLECIMIENTO / DESTINO
@@ -211,9 +224,9 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     if (transMatch && transMatch[1] && !/la\s+llave/i.test(transMatch[1])) {
       comercio = transMatch[1].trim();
     }
-  } else if (text.match(/\ben\s+([A-Za-z0-9*._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|a\s+las|\*|\.|\$|,))/i)) {
+  } else if (text.match(/\ben\s+([A-Za-z0-9*._\-&\s]{3,45}?)(?:\s+con\s+(?:tu|su|t\.|\*)|(?:\s+el\s+[0-9])|\s+desde|\s+a\s+las|\.|\$|,)/i)) {
     // C) Compra estándar "en COMERCIO":
-    const enMatch = text.match(/\ben\s+([A-Za-z0-9*._\-&]{3,35}?)(?:\s+(?:por|con|el|desde|a\s+las|\*|\.|\$|,))/i);
+    const enMatch = text.match(/\ben\s+([A-Za-z0-9*._\-&\s]{3,45}?)(?:\s+con\s+(?:tu|su|t\.|\*)|(?:\s+el\s+[0-9])|\s+desde|\s+a\s+las|\.|\$|,)/i);
     if (enMatch && enMatch[1]) {
       const candidate = enMatch[1].trim();
       if (!/^(la\s+tarjeta|su\s+t|tu\s+tarjeta)/i.test(candidate)) {
@@ -232,7 +245,12 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
   let categoriaSugerida = 'Salidas';
   let confianza: 'alta' | 'media' = 'media';
 
-  if (tipoTransaccion === 'retiro' && /fiducuenta/i.test(cLower)) {
+  // Si es COMPRA CON TARJETA DE CRÉDITO:
+  if (tipoTransaccion === 'compra_tc') {
+    categoriaSugerida = 'Deudas tarjetas';
+    cuenta = 'tarjeta_credito';
+    confianza = 'alta';
+  } else if (tipoTransaccion === 'retiro' && /fiducuenta/i.test(cLower)) {
     categoriaSugerida = 'Fiduciaria';
     confianza = 'alta';
   } else if (tipoTransaccion === 'pago_credito') {
@@ -257,7 +275,6 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     cuenta = 'bonos';
     confianza = 'alta';
   } else if (cuenta === 'bonos') {
-    // Compras de bonos en Starbucks, Pyco, restaurantes de centro comercial
     categoriaSugerida = 'Salidas 1';
     confianza = 'alta';
   } else if (/texaco|primax|terpel|esso|mobil|gasol|lavadero/i.test(cLower)) {
@@ -272,8 +289,10 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
   }
 
   let mensajeAccion = undefined;
-  if (isTarjetaCredito) {
-    mensajeAccion = `💳 Compra con Tarjeta de Crédito (${tarjetaRef || 'TC'}): Se descontará de ${categoriaSugerida} y se sumará a la Deuda de Tarjetas.`;
+  if (tipoTransaccion === 'compra_tc') {
+    mensajeAccion = `💳 Compra con Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Suma a tu deuda en la celda I8 (Fila 8) y NO se descuenta de tu cuenta de ahorros de Manejo.`;
+  } else if (tipoTransaccion === 'pago_credito') {
+    mensajeAccion = `💳 Pago a Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Se descuenta de tu saldo de Manejo y disminuye la deuda de tu tarjeta.`;
   }
 
   return {
@@ -286,6 +305,7 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     cuentaSugerida: cuenta,
     isTarjetaCredito,
     tarjetaRef,
+    tarjetaNombre,
     confianza,
     mensajeAccion
   };

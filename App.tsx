@@ -637,12 +637,35 @@ export default function App() {
               <View style={styles.debtRow}>
                 <View>
                   <Text style={styles.debtName}>Tarjetas de Crédito</Text>
-                  <Text style={styles.debtMeta}>Infinity (15) / Rappi (30) / Scotia (30)</Text>
+                  <Text style={styles.debtMeta}>
+                    {dashboardData?.deudas.tarjetasDetalle && dashboardData.deudas.tarjetasDetalle.length > 0
+                      ? `${dashboardData.deudas.tarjetasDetalle.length} tarjetas registradas (H8:J11)`
+                      : 'Infinity (15) / Rappi (30) / Scotia (30)'}
+                  </Text>
                 </View>
                 <Text style={[styles.debtAmount, { color: (dashboardData?.deudas.totalDeudaTarjetas || 0) > 0 ? '#EF4444' : '#10B981' }]}>
                   {formatCOP(dashboardData?.deudas.totalDeudaTarjetas || 0)}
                 </Text>
               </View>
+
+              {/* DESGLOSE INDIVIDUAL DE CADA TARJETA (H8:J11) */}
+              {dashboardData?.deudas.tarjetasDetalle && dashboardData.deudas.tarjetasDetalle.length > 0 && (
+                <View style={styles.tcDetalleList}>
+                  {dashboardData.deudas.tarjetasDetalle.map((tc, idx) => (
+                    <View key={idx} style={styles.tcDetalleRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.tcDetalleName}>{tc.nombre}</Text>
+                        <View style={styles.tcCorteBadge}>
+                          <Text style={styles.tcCorteBadgeText}>Día {tc.fechaPago || '15'}</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.tcDetalleVal, { color: tc.saldo > 0 ? '#F59E0B' : '#10B981' }]}>
+                        {formatCOP(tc.saldo)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* VISTA RÁPIDA DE SUSCRIPCIONES */}
@@ -2429,6 +2452,39 @@ const styles = StyleSheet.create({
   },
   chipPresetText: {
     color: CONFIG.COLORS.accentMint,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  tcDetalleList: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 6
+  },
+  tcDetalleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3
+  },
+  tcDetalleName: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  tcCorteBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
+  },
+  tcCorteBadgeText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '600'
+  },
+  tcDetalleVal: {
     fontSize: 12,
     fontWeight: '700'
   }

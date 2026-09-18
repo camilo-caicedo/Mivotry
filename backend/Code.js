@@ -84,6 +84,9 @@ function doPost(e) {
       case "procesarNotificacionPendiente":
         return createJsonResponse(procesarNotificacionPendiente(contents));
         
+      case "actualizarSaldoTarjetaCredito":
+        return createJsonResponse(actualizarSaldoTarjetaCredito(contents));
+        
       case "aprobarLoteNotificaciones":
         return createJsonResponse(aprobarLoteNotificaciones(contents));
         
@@ -179,7 +182,25 @@ function getDashboardData() {
     fechaPago: sheet.getRange("J5").getValue()
   };
   const totalDeudaCreditos = cleanNumber(sheet.getRange("I13").getValue());
-  const totalDeudaTarjetas = cleanNumber(sheet.getRange("J13").getValue());
+  
+  // Tarjetas de Crédito Individuales (Filas 8 a 11, Columnas H a J)
+  const rowsTarjetas = sheet.getRange("H8:J11").getValues();
+  const listaTarjetas = [];
+  let sumaTarjetas = 0;
+  for (let i = 0; i < rowsTarjetas.length; i++) {
+    const row = rowsTarjetas[i];
+    const nombre = String(row[0] || "").trim();
+    if (!nombre) continue;
+    const saldo = cleanNumber(row[1]);
+    sumaTarjetas += saldo;
+    listaTarjetas.push({
+      fila: 8 + i,
+      nombre: nombre,
+      saldo: saldo,
+      fechaPago: String(row[2] || "").trim()
+    });
+  }
+  const totalDeudaTarjetas = cleanNumber(sheet.getRange("J13").getValue()) || sumaTarjetas;
   
   // F. Servicios Streaming (Columna L a O, filas 4 a 15)
   const rowsStreaming = sheet.getRange("L4:O15").getValues();
@@ -279,6 +300,7 @@ function getDashboardData() {
       creditoOccidente: creditoOccidente,
       totalDeudaCreditos: totalDeudaCreditos,
       totalDeudaTarjetas: totalDeudaTarjetas,
+      tarjetasDetalle: listaTarjetas,
       cuentasPorCobrar: deudasTerceros,
       totalPorCobrar: totalPorCobrar
     },
@@ -611,6 +633,100 @@ function actualizarEstadoPagoAnual(payload) {
 
 /**
  * =========================================================================
+ * 6C. ACTUALIZAR SALDO DE TARJETA DE CRÉDITO (H8:J11)
+ * =========================================================================
+ * Fila 8: Infinity (*2068)
+ * Fila 9: Rappi
+ * Fila 10: Scotia
+ * Fila 11: Falabella
+ * 
+ * - Si es COMPRA (operacion = "sumar"): Aumenta la deuda en columna I y NO descuenta de Manejo.
+ * - Si es PAGO (operacion = "restar"): Disminuye la deuda en columna I.
+ */
+function actualizarSaldoTarjetaCredito(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+  
+  const tarjetaNombre = String(payload.tarjeta || payload.nombre || "").trim().toLowerCase();
+  const tarjetaFila = Number(payload.fila);
+  const monto = cleanNumber(payload.monto);
+  const operacion = payload.operacion || "sumar"; // "sumar" = compra con TC, "restar" = pago de cuota
+  const concepto = String(payload.concepto || ("Movimiento con tarjeta " + (payload.tarjeta || ""))).trim();
+  
+  if (monto <= 0) return { success: false, error: "El monto debe ser mayor a cero" };
+  
+  let targetRow = null;
+  let targetName = "";
+  
+  if (tarjetaFila >= 8 && tarjetaFila <= 11) {
+    targetRow = tarjetaFila;
+    targetName = sheet.getRange("H" + targetRow).getValue();
+  } else {
+    const rows = sheet.getRange("H8:J11").getValues();
+    for (let i = 0; i < rows.length; i++) {
+      const name = String(rows[i][0] || "").trim().toLowerCase();
+      if (name && (name.includes(tarjetaNombre) || tarjetaNombre.includes(name))) {
+        targetRow = 8 + i;
+        targetName = rows[i][0];
+        break;
+      }
+    }
+  }
+  
+  if (!targetRow) {
+    const rows = sheet.getRange("H8:J11").getValues();
+    for (let i = 0; i < rows.length; i++) {
+      const name = String(rows[i][0] || "").trim().toLowerCase();
+      if (
+        ((tarjetaNombre.includes("infinity") || tarjetaNombre.includes("2068") || tarjetaNombre.includes("bancolombia")) && name.includes("infinity")) ||
+        (tarjetaNombre.includes("rappi") && name.includes("rappi")) ||
+        ((tarjetaNombre.includes("scotia") || tarjetaNombre.includes("colpatria")) && name.includes("scotia")) ||
+        (tarjetaNombre.includes("falabella") && name.includes("falabella"))
+      ) {
+        targetRow = 8 + i;
+        targetName = rows[i][0];
+        break;
+      }
+    }
+  }
+  
+  // Por defecto si es Bancolombia / *2068 y no hubo match: Infinity (Fila 8)
+  if (!targetRow && (tarjetaNombre.includes("2068") || tarjetaNombre.includes("bancolombia"))) {
+    targetRow = 8;
+    targetName = sheet.getRange("H8").getValue() || "Infinity";
+  }
+  
+  if (!targetRow) {
+    return { success: false, error: "No se encontró la tarjeta en filas H8:H11 para: " + tarjetaNombre };
+  }
+  
+  const cell = sheet.getRange("I" + targetRow);
+  const saldoActual = cleanNumber(cell.getValue());
+  const nuevoSaldo = (operacion === "sumar") ? (saldoActual + monto) : Math.max(0, saldoActual - monto);
+  
+  cell.setValue(nuevoSaldo);
+  
+  logTransaction(ss, {
+    cuenta: "tarjeta_credito",
+    categoria: "Deuda Tarjetas (" + targetName + ")",
+    concepto: concepto + " (" + (operacion === "sumar" ? "+" : "-") + monto + ")",
+    monto: monto,
+    saldoRestante: nuevoSaldo,
+    origen: payload.origen || "app"
+  });
+  
+  return {
+    success: true,
+    fila: targetRow,
+    tarjeta: targetName,
+    saldoAnterior: saldoActual,
+    nuevoSaldo: nuevoSaldo,
+    operacion: operacion
+  };
+}
+
+/**
+ * =========================================================================
  * 7. PARSER DE SMS BANCARIOS (COLOMBIA)
  * =========================================================================
  */
@@ -619,8 +735,10 @@ function parseSMSBancario(payload) {
   let monto = 0;
   let comercio = "";
   let entidad = "Desconocida";
-  let sugerenciaCategoria = "Salidas";
+  let sugerenciaCategoria = "Salidas 1";
   let cuenta = "nomina";
+  let isTarjetaCredito = false;
+  let tarjetaNombre = "";
   
   if (/peoplepass|paycash/i.test(sms)) {
     entidad = "Peoplepass Paycash";
@@ -630,9 +748,9 @@ function parseSMSBancario(payload) {
   else if (/scotia|colpatria/i.test(sms)) entidad = "Scotiabank Colpatria";
   else if (/rappi/i.test(sms)) entidad = "RappiCard";
   else if (/falabella/i.test(sms)) entidad = "Falabella";
-  else if (/davivienda/i.test(sms)) entidad = "Davivienda";
+  else if (/davivienda|davibank/i.test(sms)) entidad = "DAVIbank (Davivienda)";
   
-  const montoMatch = sms.match(/\$\s?([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)/);
+  const montoMatch = sms.match(/(?:\$|COP)\s?([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)/i);
   if (montoMatch && montoMatch[1]) {
     monto = cleanNumber(montoMatch[1]);
   }
@@ -642,20 +760,38 @@ function parseSMSBancario(payload) {
     comercio = comercioMatch[1].trim();
   }
   
+  // Detección de Tarjeta de Crédito (T.Cred)
+  if (/t\.cred|tarjeta de credito|visa oro|rappicard/i.test(sms)) {
+    isTarjetaCredito = true;
+    if (/2068|infinity/i.test(sms)) tarjetaNombre = "Infinity";
+    else if (/rappi/i.test(sms)) tarjetaNombre = "Rappi";
+    else if (/scotia|colpatria/i.test(sms)) tarjetaNombre = "Scotia";
+    else if (/falabella/i.test(sms)) tarjetaNombre = "Falabella";
+    else tarjetaNombre = "Infinity"; // default Bancolombia
+    
+    // Si NO es pago de tarjeta, es COMPRA con TC:
+    if (!/pagaste.*tarjeta/i.test(sms)) {
+      cuenta = "tarjeta_credito";
+      sugerenciaCategoria = "Deudas tarjetas";
+    }
+  }
+  
   const cLower = comercio.toLowerCase();
-  if (/texaco|primax|terpel|esso|mobil|gasol/i.test(cLower)) {
-    sugerenciaCategoria = "Gasolina/Lavar";
-  } else if (/pricesmart/i.test(cLower)) {
-    sugerenciaCategoria = "Pricesmart";
-    cuenta = "bonos";
-  } else if (/olimpica|exito|carulla|d1|ara|jumbo|verdura/i.test(cLower)) {
-    sugerenciaCategoria = "Verduras y demas";
-    cuenta = "bonos";
-  } else if (/veterin|pet|gato|laika/i.test(cLower)) {
-    sugerenciaCategoria = "Gatos";
-    cuenta = "bonos";
-  } else if (/netflix|disney|prime|hbo|max|spotify|crunchy/i.test(cLower)) {
-    sugerenciaCategoria = "Subs";
+  if (cuenta !== "tarjeta_credito") {
+    if (/texaco|primax|terpel|esso|mobil|gasol/i.test(cLower)) {
+      sugerenciaCategoria = "Gasolina/Lavar";
+    } else if (/pricesmart/i.test(cLower)) {
+      sugerenciaCategoria = "Pricesmart";
+      cuenta = "bonos";
+    } else if (/olimpica|exito|carulla|d1|ara|jumbo|verdura/i.test(cLower)) {
+      sugerenciaCategoria = "Verduras y demas";
+      cuenta = "bonos";
+    } else if (/veterin|pet|gato|laika/i.test(cLower)) {
+      sugerenciaCategoria = "Gatos";
+      cuenta = "bonos";
+    } else if (/netflix|disney|prime|hbo|max|spotify|crunchy/i.test(cLower)) {
+      sugerenciaCategoria = "Subs";
+    }
   }
   
   return {
@@ -666,7 +802,9 @@ function parseSMSBancario(payload) {
       monto: monto,
       comercio: comercio,
       categoriaSugerida: sugerenciaCategoria,
-      cuentaSugerida: cuenta
+      cuentaSugerida: cuenta,
+      isTarjetaCredito: isTarjetaCredito,
+      tarjetaNombre: tarjetaNombre
     }
   };
 }
@@ -868,6 +1006,32 @@ function procesarNotificacionPendiente(payload) {
   const cuenta = payload.cuenta || pSheet.getRange(targetRow, 8).getValue();
   const monto = payload.monto || cleanNumber(pSheet.getRange(targetRow, 5).getValue());
   const comercio = payload.concepto || pSheet.getRange(targetRow, 6).getValue();
+  
+  // Si la cuenta o categoría es de tarjeta de crédito (NO descuenta de Manejo, SUMA a deuda de la TC):
+  if (cuenta === "tarjeta_credito" || categoria === "Deudas tarjetas" || String(payload.isTarjetaCredito) === "true") {
+    const resTC = actualizarSaldoTarjetaCredito({
+      tarjeta: payload.tarjeta || comercio || "Infinity",
+      monto: monto,
+      operacion: "sumar",
+      concepto: comercio || ("Consumo TC (" + categoria + ")"),
+      origen: "notificacion_tc_aprobada"
+    });
+    
+    if (!resTC.success) {
+      return { success: false, error: "Error al actualizar tarjeta de crédito: " + resTC.error };
+    }
+    
+    pSheet.getRange(targetRow, 9).setValue("Aprobado");
+    pSheet.getRange(targetRow, 10).setValue(fechaProcesado);
+    
+    return {
+      success: true,
+      id: id,
+      accion: "aprobado",
+      tipo: "tarjeta_credito",
+      tarjetaCredito: resTC
+    };
+  }
   
   const resGasto = registrarGasto({
     cuenta: cuenta,

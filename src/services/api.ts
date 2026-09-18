@@ -37,6 +37,13 @@ export interface NotificacionPendienteItem {
   estado: 'Pendiente' | 'Aprobado' | 'Descartado';
 }
 
+export interface TarjetaCreditoItem {
+  fila: number;
+  nombre: string;
+  saldo: number;
+  fechaPago: string;
+}
+
 export interface DashboardResponse {
   nomina: {
     quincenaBase: number;
@@ -54,6 +61,7 @@ export interface DashboardResponse {
     creditoOccidente: { nombre: string; saldo: number; fechaPago: string };
     totalDeudaCreditos: number;
     totalDeudaTarjetas: number;
+    tarjetasDetalle?: TarjetaCreditoItem[];
     cuentasPorCobrar: Array<{ fila: number; nombre: string; saldoPendiente: number }>;
     totalPorCobrar: number;
   };
@@ -260,6 +268,31 @@ export const MivotryAPI = {
         action: 'recibirNotificacionExterna',
         texto,
         origen
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Actualiza el saldo de una tarjeta de crédito específica (H8:J11)
+   * operacion: 'sumar' (consumo con TC) | 'restar' (pago de tarjeta)
+   */
+  async actualizarSaldoTarjetaCredito(params: {
+    tarjeta: string;
+    monto: number;
+    operacion?: 'sumar' | 'restar';
+    concepto?: string;
+    fila?: number;
+  }) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'actualizarSaldoTarjetaCredito',
+        tarjeta: params.tarjeta,
+        monto: params.monto,
+        operacion: params.operacion || 'sumar',
+        concepto: params.concepto,
+        fila: params.fila
       })
     });
     return await res.json();
