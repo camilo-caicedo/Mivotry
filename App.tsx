@@ -10,7 +10,9 @@ import {
   StatusBar,
   Dimensions,
   Image,
-  Alert
+  Alert,
+  Modal,
+  TextInput
 } from 'react-native';
 import {
   LayoutDashboard,
@@ -29,7 +31,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Compass,
-  Utensils
+  Utensils,
+  X
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +49,18 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [activeQuincena, setActiveQuincena] = useState<15 | 30>(15);
   const [activeAccount, setActiveAccount] = useState<'nomina' | 'bonos'>('nomina');
+
+  // Estado para el Modal de Gasto Manual
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedGasto, setSelectedGasto] = useState<{
+    nombre: string;
+    cuenta: 'nomina' | 'bonos';
+    manejoActual: number;
+    presupuestoTotal: number;
+  } | null>(null);
+  const [montoInput, setMontoInput] = useState('');
+  const [conceptoInput, setConceptoInput] = useState('');
+  const [submittingExpense, setSubmittingExpense] = useState(false);
 
   const fetchDashboard = async () => {
     try {
@@ -122,6 +137,53 @@ export default function App() {
         }
       ]
     );
+  };
+
+  const handleOpenExpenseModal = (gasto: GastoItem, cuenta: 'nomina' | 'bonos') => {
+    setSelectedGasto({
+      nombre: gasto.nombre,
+      cuenta: cuenta,
+      manejoActual: gasto.manejoActual,
+      presupuestoTotal: gasto.presupuestoTotal
+    });
+    setMontoInput('');
+    setConceptoInput('');
+    setModalVisible(true);
+  };
+
+  const handleSaveExpense = async () => {
+    if (!selectedGasto) return;
+    const monto = parseFloat(montoInput.replace(/[^0-9]/g, ''));
+    if (!monto || monto <= 0) {
+      Alert.alert('Monto inválido', 'Por favor ingresa un monto mayor a cero.');
+      return;
+    }
+
+    try {
+      setSubmittingExpense(true);
+      const res = await MivotryAPI.registrarGasto({
+        cuenta: selectedGasto.cuenta,
+        categoria: selectedGasto.nombre,
+        monto: monto,
+        concepto: conceptoInput.trim() || `Gasto en ${selectedGasto.nombre}`,
+        origen: 'manual'
+      });
+
+      if (res.success) {
+        Alert.alert(
+          'Gasto Registrado',
+          `Se descontaron ${formatCOP(monto)} de ${selectedGasto.nombre}. Nuevo saldo: ${formatCOP(res.nuevoSaldo)}`
+        );
+        setModalVisible(false);
+        fetchDashboard();
+      } else {
+        Alert.alert('Error', res.error || 'No se pudo registrar');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSubmittingExpense(false);
+    }
   };
 
   if (loading && !dashboardData) {
@@ -450,7 +512,12 @@ export default function App() {
 
             {/* LISTA DE RUBROS EN MANEJO */}
             {(activeAccount === 'nomina' ? dashboardData?.nomina.gastos : dashboardData?.bonos.gastos)?.map((gasto, idx) => (
-              <View key={idx} style={styles.manejoItemCard}>
+              <TouchableOpacity
+                key={idx}
+                style={styles.manejoItemCard}
+                activeOpacity={0.7}
+                onPress={() => handleOpenExpenseModal(gasto, activeAccount)}
+              >
                 <View style={styles.manejoTopRow}>
                   <Text style={styles.manejoItemName}>{gasto.nombre}</Text>
                   <Text style={styles.manejoItemBalance}>
@@ -472,7 +539,7 @@ export default function App() {
                     </View>
                   )}
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -566,6 +633,80 @@ export default function App() {
           <Text style={[styles.navLabel, activeTab === 'bolsillos' && styles.navLabelActive]}>Bolsillos</Text>
         </TouchableOpacity>
       </View>
+
+      {/* MODAL BOTTOM SHEET: REGISTRO MANUAL DE GASTO */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            {/* CABECERA DEL MODAL */}
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalCategoryTitle}>{selectedGasto?.nombre}</Text>
+                <Text style={styles.modalCategorySub}>
+                  Cuenta: {selectedGasto?.cuenta === 'bonos' ? 'Tarjeta Bonos' : 'Sueldo Nómina'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setModalVisible(false)}
+              >
+                <X size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* ESTADO DE SALDO ACTUAL */}
+            <View style={styles.modalBalanceBox}>
+              <Text style={styles.modalBalanceLabel}>Saldo disponible en Manejo:</Text>
+              <Text style={styles.modalBalanceValue}>
+                {formatCOP(selectedGasto?.manejoActual)}
+              </Text>
+            </View>
+
+            {/* INPUT DE MONTO */}
+            <Text style={styles.inputFieldLabel}>Monto a descontar ($ COP):</Text>
+            <TextInput
+              style={styles.modalInputMonto}
+              placeholder="$0"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+              value={montoInput}
+              onChangeText={setMontoInput}
+              autoFocus={true}
+            />
+
+            {/* INPUT DE CONCEPTO / NOTA */}
+            <Text style={styles.inputFieldLabel}>Concepto o detalle (opcional):</Text>
+            <TextInput
+              style={styles.modalInputConcepto}
+              placeholder="Ej. Tanqueada, Almuerzo, etc."
+              placeholderTextColor="#94A3B8"
+              value={conceptoInput}
+              onChangeText={setConceptoInput}
+            />
+
+            {/* BOTÓN DE CONFIRMACIÓN */}
+            <TouchableOpacity
+              style={[
+                styles.modalSubmitBtn,
+                (!montoInput.trim() || submittingExpense) && styles.modalSubmitBtnDisabled
+              ]}
+              onPress={handleSaveExpense}
+              disabled={!montoInput.trim() || submittingExpense}
+            >
+              {submittingExpense ? (
+                <ActivityIndicator size="small" color="#06181D" />
+              ) : (
+                <Text style={styles.modalSubmitBtnText}>Registrar en Google Sheets</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -1118,6 +1259,107 @@ const styles = StyleSheet.create({
   },
   navLabelActive: {
     color: '#10B981',
+    fontWeight: '700'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end'
+  },
+  modalSheet: {
+    backgroundColor: '#0F3741',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 36,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16
+  },
+  modalCategoryTitle: {
+    color: '#F1F5F9',
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  modalCategorySub: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalBalanceBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)'
+  },
+  modalBalanceLabel: {
+    color: '#94A3B8',
+    fontSize: 12
+  },
+  modalBalanceValue: {
+    color: '#10B981',
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  inputFieldLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginBottom: 6,
+    fontWeight: '500'
+  },
+  modalInputMonto: {
+    backgroundColor: '#0B2B33',
+    borderRadius: 14,
+    color: '#F1F5F9',
+    fontSize: 24,
+    fontWeight: '800',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)'
+  },
+  modalInputConcepto: {
+    backgroundColor: '#0B2B33',
+    borderRadius: 14,
+    color: '#F1F5F9',
+    fontSize: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center'
+  },
+  modalSubmitBtnDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+  },
+  modalSubmitBtnText: {
+    color: '#06181D',
+    fontSize: 15,
     fontWeight: '700'
   }
 });
