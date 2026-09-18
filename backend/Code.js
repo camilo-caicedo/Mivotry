@@ -46,6 +46,9 @@ function doPost(e) {
       case "cargarQuincena":
         return createJsonResponse(cargarQuincena(contents));
         
+      case "recargarBonos":
+        return createJsonResponse(recargarBonos(contents));
+        
       case "abonoDeuda":
         return createJsonResponse(abonoDeuda(contents));
         
@@ -377,6 +380,55 @@ function cargarQuincena(payload) {
  * 4. ABONO A DEUDAS DE TERCEROS
  * =========================================================================
  */
+
+/**
+ * =========================================================================
+ * 3.B RECARGAR BONOS PEOPLEPASS PAYCASH ($1.600.000 cada día 15)
+ * =========================================================================
+ */
+function recargarBonos(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+  const rows = sheet.getRange("A23:C27").getValues();
+  
+  const actualizados = [];
+  
+  for (let i = 0; i < rows.length; i++) {
+    const nombre = String(rows[i][0] || "").trim();
+    if (!nombre) continue;
+    
+    const rowNum = 23 + i;
+    const presupuestoBase = cleanNumber(rows[i][1]); // Columna B
+    const manejoActual = cleanNumber(rows[i][2]);    // Columna C actual
+    
+    // Regla de acumulación: lo que quedó + nuevo presupuesto
+    const nuevoManejo = (manejoActual > 0 ? manejoActual : 0) + presupuestoBase;
+    sheet.getRange(rowNum, 3).setValue(nuevoManejo);
+    
+    actualizados.push({
+      rubro: nombre,
+      presupuestoBase: presupuestoBase,
+      remanentePrevio: manejoActual,
+      nuevoTotalManejo: nuevoManejo
+    });
+  }
+  
+  logTransaction(ss, {
+    cuenta: "bonos",
+    categoria: "SISTEMA",
+    concepto: "Recarga Mensual Bonos Peoplepass Paycash ($1.600.000)",
+    monto: 1600000,
+    saldoRestante: 0,
+    origen: "sistema"
+  });
+  
+  return {
+    success: true,
+    mensaje: "Bonos Peoplepass Paycash recargados exitosamente",
+    rubrosActualizados: actualizados
+  };
+}
+
 function abonoDeuda(payload) {
   const persona = String(payload.persona || "").trim();
   const monto = Number(payload.monto) || 0;
@@ -479,7 +531,10 @@ function parseSMSBancario(payload) {
   let sugerenciaCategoria = "Salidas";
   let cuenta = "nomina";
   
-  if (/bogot[aá]/i.test(sms)) entidad = "Banco de Bogotá";
+  if (/peoplepass|paycash/i.test(sms)) {
+    entidad = "Peoplepass Paycash";
+    cuenta = "bonos";
+  } else if (/bogot[aá]/i.test(sms)) entidad = "Banco de Bogotá";
   else if (/bancolombia/i.test(sms)) entidad = "Bancolombia";
   else if (/scotia|colpatria/i.test(sms)) entidad = "Scotiabank Colpatria";
   else if (/rappi/i.test(sms)) entidad = "RappiCard";

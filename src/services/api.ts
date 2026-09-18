@@ -95,6 +95,17 @@ export const MivotryAPI = {
   },
 
   /**
+   * Recarga mensual de la tarjeta de bonos Peoplepass Paycash ($1.600.000)
+   */
+  async recargarBonos() {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'recargarBonos' })
+    });
+    return await res.json();
+  },
+
+  /**
    * Parsea un SMS de un banco colombiano
    */
   async parseSMS(texto: string) {

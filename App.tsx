@@ -70,6 +70,32 @@ export default function App() {
     return '$' + Math.round(val).toLocaleString('es-CO');
   };
 
+
+  const handleRecargarBonos = () => {
+    Alert.alert(
+      'Recargar Tarjeta Bonos (Peoplepass)',
+      '¿Deseas registrar la recarga mensual de $1.600.000 en Peoplepass Paycash? Se sumarán los presupuestos (PriceSmart, Verduras, Gatos, Salidas) al remanente actual de Manejo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar Recarga',
+          style: 'default',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await MivotryAPI.recargarBonos();
+              Alert.alert('¡Éxito!', 'Tarjeta de Bonos Peoplepass recargada con éxito.');
+              fetchDashboard();
+            } catch (e: any) {
+              Alert.alert('Error', e.message);
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleCargarQuincena = (q: 15 | 30) => {
     Alert.alert(
       'Cargar Quincena ' + q,
@@ -312,6 +338,22 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
             </View>
+
+                        {/* BANNER DE RECARGA PEOPLEPASS PAYCASH (DÍA 15) */}
+            {activeAccount === 'bonos' && (
+              <View style={styles.peoplepassBanner}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.peoplepassTitle}>Peoplepass Paycash</Text>
+                  <Text style={styles.peoplepassDesc}>Recarga mensual de $1.600.000 cada día 15</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.recargarBonosBtn}
+                  onPress={handleRecargarBonos}
+                >
+                  <Text style={styles.recargarBonosBtnText}>Recargar $1.6M</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Text style={styles.sectionSubtitle}>
               Toca cualquier rubro para registrar un gasto o marcar su pago:
@@ -725,6 +767,38 @@ const styles = StyleSheet.create({
   streamingTagBank: {
     color: '#94A3B8',
     fontSize: 10
+  },
+  peoplepassBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0B2B33',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  peoplepassTitle: {
+    color: '#F1F5F9',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  peoplepassDesc: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2
+  },
+  recargarBonosBtn: {
+    backgroundColor: '#10B981',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8
+  },
+  recargarBonosBtnText: {
+    color: '#06181D',
+    fontSize: 12,
+    fontWeight: '700'
   },
   accountSelectorRow: {
     flexDirection: 'row',
