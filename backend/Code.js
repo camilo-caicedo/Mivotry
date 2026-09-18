@@ -898,12 +898,35 @@ function ensurePendientesSheetExists(ss) {
 
 function recibirNotificacionExterna(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const pSheet = ensurePendientesSheetExists(ss);
   
   const texto = String(payload.texto || payload.sms || "").trim();
-  if (!texto) return { success: false, error: "Texto de notificación vacío" };
+  if (!texto || texto.length < 10) {
+    return { success: false, ignorado: true, motivo: "Texto de notificación vacío o demasiado corto" };
+  }
   
-  const parsed = parseSMSBancario({ sms: texto }).parseResult;
+  // 1. FILTRAR MENSAJES DE SEGURIDAD / INFORMACIÓN (Clave dinámica, OTP, inicio de sesión, etc.)
+  const isSecurity = /clave din[aá]mica|c[oó]digo de seguridad|c[oó]digo de verificaci[oó]n|token|otp|iniciaste sesi[oó]n|alerta de inicio|cambio de clave|actualiza tus datos|feliz cumplea[ñn]os|conoce nuestras|oferta comercial|cr[eé]dito preaprobado/i.test(texto);
+  const hasMoneyOrTransaction = /(?:\$|COP)\s*[0-9]/i.test(texto) || /compr|pag|transfer|recib|abono|retir/i.test(texto);
+  
+  if (isSecurity && !hasMoneyOrTransaction) {
+    return { success: false, ignorado: true, motivo: "Mensaje de seguridad o informativo (no es transacción)" };
+  }
+
+  const parseRes = parseSMSBancario({ sms: texto });
+  const parsed = parseRes ? parseRes.parseResult : null;
+  
+  // 2. FILTRAR SI NO DETECTA UN MONTO VÁLIDO MAYOR A CERO
+  if (!parsed || !parsed.monto || parsed.monto <= 0) {
+    return { success: false, ignorado: true, motivo: "No se detectó un monto monetario válido" };
+  }
+  
+  // 3. FILTRAR SI NO TIENE ESTRUCTURA BANCARIA / FINANCIERA
+  const isFinancial = hasMoneyOrTransaction || parsed.isTarjetaCredito || parsed.tipoTransaccion !== "compra";
+  if (!isFinancial) {
+    return { success: false, ignorado: true, motivo: "No corresponde a una compra, pago o transferencia bancaria" };
+  }
+
+  const pSheet = ensurePendientesSheetExists(ss);
   const now = new Date();
   const id = "NOTIF_" + now.getTime() + "_" + Math.floor(Math.random() * 1000);
   const fechaHora = Utilities.formatDate(now, "America/Bogota", "yyyy-MM-dd HH:mm:ss");

@@ -139,7 +139,14 @@ function cleanMoneyValue(rawText: string): number {
 
 export function parseBankSMS(rawText: string): ParsedBankSMS | null {
   const text = String(rawText || '').trim();
-  if (!text || text.length < 8) return null;
+  if (!text || text.length < 10) return null;
+
+  // 0. FILTRO DE EXCLUSIÓN: Mensajes no financieros (OTP, Clave Dinámica, Spam, etc.)
+  const isSecurity = /clave din[aá]mica|c[oó]digo de seguridad|c[oó]digo de verificaci[oó]n|token|otp|iniciaste sesi[oó]n|alerta de inicio|cambio de clave|actualiza tus datos|feliz cumplea[ñn]os|conoce nuestras|oferta comercial|cr[eé]dito preaprobado/i.test(text);
+  const hasMoneyOrAction = /(?:\$|COP)\s*[0-9]/i.test(text) || /compr|pag|transfer|recib|abono|retir/i.test(text);
+  if (isSecurity && !hasMoneyOrAction) {
+    return null;
+  }
 
   // 1. CASO ESPECIAL: PAGO DE NÓMINA EMPRESA (PERFICIENT)
   if (/perficient/i.test(text) && /recibiste|pago|abono/i.test(text)) {
