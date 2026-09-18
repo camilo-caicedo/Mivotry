@@ -271,12 +271,14 @@ export default function App() {
               </View>
             </View>
 
-            {/* TARJETA DE CRÉDITOS Y DEUDAS */}
+            {/* TARJETA DE DEUDAS */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Créditos Principales</Text>
+                <Text style={styles.cardTitle}>Deudas</Text>
                 <CreditCard size={18} color={CONFIG.COLORS.textMuted} />
               </View>
+
+              {/* CRÉDITO OCCIDENTE */}
               <View style={styles.debtRow}>
                 <View>
                   <Text style={styles.debtName}>Crédito Occidente</Text>
@@ -287,6 +289,8 @@ export default function App() {
                 </Text>
               </View>
               <View style={styles.debtDivider} />
+
+              {/* CRÉDITO APTO */}
               <View style={styles.debtRow}>
                 <View>
                   <Text style={styles.debtName}>Crédito Hipotecario Apto</Text>
@@ -294,6 +298,18 @@ export default function App() {
                 </View>
                 <Text style={styles.debtAmount}>
                   {formatCOP(dashboardData?.deudas.creditoApto.saldo || 75300000)}
+                </Text>
+              </View>
+              <View style={styles.debtDivider} />
+
+              {/* TARJETAS DE CRÉDITO */}
+              <View style={styles.debtRow}>
+                <View>
+                  <Text style={styles.debtName}>Tarjetas de Crédito</Text>
+                  <Text style={styles.debtMeta}>Infinity (15) / Rappi (30) / Scotia (30)</Text>
+                </View>
+                <Text style={[styles.debtAmount, { color: (dashboardData?.deudas.totalDeudaTarjetas || 0) > 0 ? '#EF4444' : '#10B981' }]}>
+                  {formatCOP(dashboardData?.deudas.totalDeudaTarjetas || 0)}
                 </Text>
               </View>
             </View>
