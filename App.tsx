@@ -33,6 +33,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CONFIG } from './src/config';
 import { MivotryAPI, DashboardResponse, GastoItem } from './src/services/api';
+import { ChatAssistant } from './src/components/ChatAssistant';
 
 const { width } = Dimensions.get('window');
 
@@ -174,13 +175,19 @@ export default function App() {
       </View>
 
       {/* CONTENIDO PRINCIPAL POR PESTAÑAS */}
-      <ScrollView
-        style={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CONFIG.COLORS.accentMint} />
-        }
-      >
-        {activeTab === 'dashboard' && (
+      {activeTab === 'chat' ? (
+        <ChatAssistant
+          dashboardData={dashboardData}
+          onExpenseRegistered={fetchDashboard}
+        />
+      ) : (
+        <ScrollView
+          style={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CONFIG.COLORS.accentMint} />
+          }
+        >
+          {activeTab === 'dashboard' && (
           <View style={styles.tabContainer}>
             {/* HERO CARD DE SALDOS */}
             <View style={styles.heroCard}>
@@ -404,23 +411,7 @@ export default function App() {
           </View>
         )}
 
-        {activeTab === 'chat' && (
-          <View style={styles.tabContainer}>
-            <View style={styles.chatPlaceholderCard}>
-              <MessageSquare size={36} color={CONFIG.COLORS.accentMint} style={{ marginBottom: 12 }} />
-              <Text style={styles.chatTitle}>Asistente Financiero Mivotry</Text>
-              <Text style={styles.chatDesc}>
-                Escribe en lenguaje cotidiano para registrar gastos instantáneamente en tu Google Sheet:
-              </Text>
-              <View style={styles.chatExamplesBox}>
-                <Text style={styles.exampleItem}>💬 "Gasté 45.000 en gasolina"</Text>
-                <Text style={styles.exampleItem}>💬 "Compré 120k en PriceSmart con bonos"</Text>
-                <Text style={styles.exampleItem}>💬 "Mauro me pagó 50 mil"</Text>
-                <Text style={styles.exampleItem}>💬 "¿Cuánto me queda para salidas?"</Text>
-              </View>
-            </View>
-          </View>
-        )}
+
 
         {activeTab === 'bolsillos' && (
           <View style={styles.tabContainer}>
@@ -472,7 +463,8 @@ export default function App() {
             </View>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* BARRA DE NAVEGACIÓN INFERIOR (TABS) */}
       <View style={styles.bottomNav}>
