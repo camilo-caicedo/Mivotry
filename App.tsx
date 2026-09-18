@@ -27,7 +27,9 @@ import {
   CreditCard,
   Tv,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Compass,
+  Utensils
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -147,6 +149,12 @@ export default function App() {
   const totalManejoActual = dashboardData?.nomina.totalManejoF21 ?? nominaGastos.reduce((acc, item) => acc + (item.manejoActual || 0), 0);
   const porcentajeManejo = totalPresupuestadoQ > 0 ? Math.min(100, Math.round((totalManejoActual / totalPresupuestadoQ) * 100)) : 0;
 
+  // Rubro Salidas (Gastos variables)
+  const itemSalidas = nominaGastos.find(g => g.nombre.toLowerCase().includes('salida'));
+  const salidasManejo = itemSalidas?.manejoActual ?? 240000;
+  const salidasPresupuestoQ = (activeQuincena === 15 ? itemSalidas?.q15 : itemSalidas?.q30) ?? 300000;
+  const salidasPorcentaje = salidasPresupuestoQ > 0 ? Math.min(100, Math.round((salidasManejo / salidasPresupuestoQ) * 100)) : 0;
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
@@ -257,6 +265,59 @@ export default function App() {
                   <Text style={styles.cargarBtnText}>Cargar Q{activeQuincena}</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* TARJETA DEDICADA: FONDO DE SALIDAS (GASTOS VARIABLES) */}
+            <View style={styles.salidasCard}>
+              <View style={styles.salidasHeader}>
+                <View style={styles.salidasHeaderLeft}>
+                  <View style={styles.salidasIconBadge}>
+                    <Utensils size={16} color="#10B981" />
+                  </View>
+                  <View>
+                    <Text style={styles.salidasTitle}>Fondo de Salidas & Ocio</Text>
+                    <Text style={styles.salidasSubtitle}>Gastos variables quincenales</Text>
+                  </View>
+                </View>
+                <View style={styles.salidasDisponibleBadge}>
+                  <Text style={styles.salidasDisponibleBadgeText}>Disponible</Text>
+                </View>
+              </View>
+
+              <View style={styles.salidasAmountsRow}>
+                <View>
+                  <Text style={styles.salidasAmountBig}>{formatCOP(salidasManejo)}</Text>
+                  <Text style={styles.salidasAmountSub}>
+                    de {formatCOP(salidasPresupuestoQ)} presupuestados (Q{activeQuincena})
+                  </Text>
+                </View>
+                <View style={styles.salidasPercentCircle}>
+                  <Text style={styles.salidasPercentText}>{salidasPorcentaje}%</Text>
+                  <Text style={styles.salidasPercentLabel}>restante</Text>
+                </View>
+              </View>
+
+              {/* BARRA DE CONSUMO DE SALIDAS */}
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${Math.max(5, Math.min(100, salidasPorcentaje))}%`,
+                      backgroundColor:
+                        salidasPorcentaje > 40
+                          ? CONFIG.COLORS.accentMint
+                          : salidasPorcentaje > 15
+                          ? CONFIG.COLORS.accentGold
+                          : CONFIG.COLORS.accentRed
+                    }
+                  ]}
+                />
+              </View>
+
+              <Text style={styles.salidasTipText}>
+                💡 Registra salidas escribiendo en el chat: "Gasté 35k en restaurante"
+              </Text>
             </View>
 
             {/* SECCIÓN BOLSILLOS & FLOAT EN VIVO */}
@@ -687,6 +748,86 @@ const styles = StyleSheet.create({
     color: '#06181D',
     fontSize: 12,
     fontWeight: '700'
+  },
+  salidasCard: {
+    backgroundColor: '#0F3741',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  salidasHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  salidasHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  salidasIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  salidasTitle: {
+    color: '#F1F5F9',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  salidasSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11
+  },
+  salidasDisponibleBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8
+  },
+  salidasDisponibleBadgeText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  salidasAmountsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 10
+  },
+  salidasAmountBig: {
+    color: '#F1F5F9',
+    fontSize: 24,
+    fontWeight: '800'
+  },
+  salidasAmountSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2
+  },
+  salidasPercentCircle: {
+    alignItems: 'flex-end'
+  },
+  salidasPercentText: {
+    color: '#10B981',
+    fontSize: 18,
+    fontWeight: '700'
+  },
+  salidasPercentLabel: {
+    color: '#94A3B8',
+    fontSize: 10
+  },
+  salidasTipText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 10,
+    marginTop: 10
   },
   sectionHeaderRow: {
     flexDirection: 'row',
