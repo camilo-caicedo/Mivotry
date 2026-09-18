@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Mivotry",
+    "slug": "mivotry",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B2B33",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.mivotry.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
