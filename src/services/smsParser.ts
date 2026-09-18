@@ -9,18 +9,35 @@ export interface ParsedBankSMS {
   isTarjetaCredito: boolean;
   tarjetaRef?: string;
   tarjetaNombre?: string;
+  tarjetaFila?: 8 | 9 | 10 | 11;
   quincenaSugerida?: 15 | 30;
   fechaTexto?: string;
   confianza: 'alta' | 'media';
   mensajeAccion?: string;
 }
 
+export interface CardMappingInfo {
+  nombre: string;
+  fila: 8 | 9 | 10 | 11;
+  tipo: 'credito' | 'debito';
+  descripcion: string;
+}
+
+export const USER_CARD_MAPPINGS: Record<string, CardMappingInfo> = {
+  '2068': { nombre: 'Infinity', fila: 8, tipo: 'credito', descripcion: 'Bancolombia Infinity (Fila 8, celda I8)' },
+  '0899': { nombre: 'Rappi', fila: 9, tipo: 'credito', descripcion: 'RappiCard (Fila 9, celda I9)' },
+  '5248': { nombre: 'Scotia', fila: 10, tipo: 'credito', descripcion: 'Scotiabank Colpatria / Davibank (Fila 10, celda I10)' },
+  '2545': { nombre: 'Falabella', fila: 11, tipo: 'credito', descripcion: 'Banco Falabella (Fila 11, celda I11)' },
+  '3839': { nombre: 'Débito Bancolombia', fila: 8, tipo: 'debito', descripcion: 'Tarjeta Débito Cuenta de Ahorros' },
+  '1493': { nombre: 'Ahorros Bancolombia', fila: 8, tipo: 'debito', descripcion: 'Cuenta de Ahorros Principal' },
+};
+
 export interface SMSTemplate {
   titulo: string;
   banco: string;
   texto: string;
   categoriaEsperada: string;
-  cuentaEsperada: 'nomina' | 'bonos';
+  cuentaEsperada: 'nomina' | 'bonos' | 'tarjeta_credito';
 }
 
 export const SMS_TEST_TEMPLATES: SMSTemplate[] = [
@@ -46,14 +63,35 @@ export const SMS_TEST_TEMPLATES: SMSTemplate[] = [
     cuentaEsperada: 'bonos'
   },
   {
-    titulo: 'Dollarcity con TC (*2068)',
+    titulo: 'MacroDroid TC Infinity (*2068)',
     banco: 'Bancolombia',
-    texto: 'Bancolombia: Compraste COP72.000,00 en DOLLARCITY BOCHALEMA con tu T.Cred *2068, el 10/09/2026 a las 17:43. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
-    categoriaEsperada: 'Salidas',
-    cuentaEsperada: 'nomina'
+    texto: 'Bancolombia: Compraste COP18.000,00 en GOOGLE *MacroDroid D con tu T.Cred *2068, el 18/09/2026 a las 18:07. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
+    categoriaEsperada: 'Deudas tarjetas',
+    cuentaEsperada: 'tarjeta_credito'
   },
   {
-    titulo: 'Celular Claro (COMCEL)',
+    titulo: 'RappiCard Burger King (*0899)',
+    banco: 'RappiCard',
+    texto: 'RappiCard: Compraste $45.000 en BURGER KING con tu tarjeta *0899 el 18/09/2026. Transacción aprobada.',
+    categoriaEsperada: 'Deudas tarjetas',
+    cuentaEsperada: 'tarjeta_credito'
+  },
+  {
+    titulo: 'Scotia / Davibank Home Art (*5248)',
+    banco: 'Scotiabank Colpatria',
+    texto: 'Scotiabank Colpatria: Compra por $89.900 en HOME ART con tu T.Cred *5248 el 18/09/2026.',
+    categoriaEsperada: 'Deudas tarjetas',
+    cuentaEsperada: 'tarjeta_credito'
+  },
+  {
+    titulo: 'Falabella Titan (*2545)',
+    banco: 'Banco Falabella',
+    texto: 'Banco Falabella: Compra aprobada por $120.000 en FALABELLA TITAN con tu CMR *2545 el 18/09/2026.',
+    categoriaEsperada: 'Deudas tarjetas',
+    cuentaEsperada: 'tarjeta_credito'
+  },
+  {
+    titulo: 'Celular Claro Débito (*3839)',
     banco: 'Bancolombia',
     texto: 'Bancolombia: Compraste $61.899,00 en COMCEL PAGOS DE FACT con tu T.Deb *3839, el 15/09/2026 a las 13:44. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
     categoriaEsperada: 'Celular',
@@ -67,21 +105,14 @@ export const SMS_TEST_TEMPLATES: SMSTemplate[] = [
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Davibank Google WOW',
-    banco: 'DAVIbank',
-    texto: 'DAVIbank : Compra recurrente en GOOGLE *WOW Presents P por 29,900 con tu tarjeta Visa Oro 2026/09/02 17:25:52',
-    categoriaEsperada: 'Subs',
-    cuentaEsperada: 'nomina'
-  },
-  {
-    titulo: 'Transferencia Bre-b',
+    titulo: 'Transferencia Bre-b (*1493)',
     banco: 'Bancolombia',
     texto: 'Bancolombia: JUAN, transferiste $64,200.00 a la llave 3004412805 desde tu cuenta *1493 a DIANA MARCELA VARGAS MENDEZ el 18/09/26 a las 14:40. Con Bre-b es de una y gratis. Dudas al 018000912345.',
     categoriaEsperada: 'Salidas',
     cuentaEsperada: 'nomina'
   },
   {
-    titulo: 'Pago a Tarjeta Crédito (*2068)',
+    titulo: 'Pago a TC Infinity (*2068)',
     banco: 'Bancolombia',
     texto: 'Bancolombia: Pagaste $94,304 en la tarjeta de credito *2068 desde la cuenta *1493, el 17/09/2026 21:30. ¿Dudas? Llamanos al 018000912345. Estamos cerca.',
     categoriaEsperada: 'Deudas tarjetas',
@@ -177,25 +208,53 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
 
   if (monto <= 0) return null;
 
-  // 4. DETECCIÓN DE TARJETA DE CRÉDITO
-  const isTarjetaCredito = /t\.cred|tarjeta de credito|visa oro|rappicard/i.test(text);
-  let tarjetaRef: string | undefined = undefined;
-  let tarjetaNombre = 'Tarjeta de Crédito';
-  const cardMatch = text.match(/(?:t\.cred|t\.deb|tarjeta|producto|cuenta|tarjeta de credito|visa oro)\s*[*xX\s]*([0-9]{4})/i);
-  if (cardMatch && cardMatch[1]) {
-    tarjetaRef = `*${cardMatch[1]}`;
-    if (cardMatch[1] === '2068') {
-      tarjetaNombre = 'Infinity';
-    }
-  } else if (/visa oro/i.test(text)) {
-    tarjetaRef = 'Visa Oro';
-  }
+  // 4. DETECCIÓN DE TARJETA DE CRÉDITO Y CUENTA
+  // Mapeo exacto de las tarjetas del usuario:
+  // *2068: Bancolombia Infinity (Fila 8, celda I8)
+  // *0899: RappiCard (Fila 9, celda I9)
+  // *5248: Scotia o Davibank (Fila 10, celda I10)
+  // *2545: Falabella CMR (Fila 11, celda I11)
+  // *3839: Tarjeta de débito cuenta de ahorros (Manejo regular)
+  // *1493: Cuenta de ahorros principal Bancolombia (Manejo regular)
 
-  if (/infinity/i.test(text)) tarjetaNombre = 'Infinity';
-  else if (/rappi/i.test(text)) tarjetaNombre = 'Rappi';
-  else if (/scotia|colpatria/i.test(text)) tarjetaNombre = 'Scotia';
-  else if (/falabella/i.test(text)) tarjetaNombre = 'Falabella';
-  else if (isTarjetaCredito && /bancolombia/i.test(text)) tarjetaNombre = 'Infinity';
+  const cardMatch = text.match(/(?:t\.cred|t\.deb|tarjeta|producto|cuenta|tarjeta de credito|visa oro|cmr)\s*[*xX\s]*([0-9]{4})/i)
+    || text.match(/[*xX]([0-9]{4})\b/);
+
+  const last4 = cardMatch ? cardMatch[1] : undefined;
+  let tarjetaRef: string | undefined = last4 ? `*${last4}` : undefined;
+  let tarjetaNombre = 'Tarjeta de Crédito';
+  let tarjetaFila: 8 | 9 | 10 | 11 = 8;
+  let isTarjetaCredito = false;
+
+  if (last4 && USER_CARD_MAPPINGS[last4]) {
+    const cardInfo = USER_CARD_MAPPINGS[last4];
+    tarjetaNombre = cardInfo.nombre;
+    tarjetaFila = cardInfo.fila;
+    isTarjetaCredito = (cardInfo.tipo === 'credito');
+  } else if (/t\.deb/i.test(text)) {
+    isTarjetaCredito = false;
+    tarjetaNombre = 'Débito Ahorros';
+  } else if (/infinity/i.test(text)) {
+    isTarjetaCredito = true;
+    tarjetaNombre = 'Infinity';
+    tarjetaFila = 8;
+  } else if (/rappi/i.test(text)) {
+    isTarjetaCredito = true;
+    tarjetaNombre = 'Rappi';
+    tarjetaFila = 9;
+  } else if (/scotia|colpatria/i.test(text) || (/davibank|davivienda/i.test(text) && /cred|tarjeta/i.test(text))) {
+    isTarjetaCredito = true;
+    tarjetaNombre = 'Scotia';
+    tarjetaFila = 10;
+  } else if (/falabella|cmr/i.test(text)) {
+    isTarjetaCredito = true;
+    tarjetaNombre = 'Falabella';
+    tarjetaFila = 11;
+  } else if (/t\.cred|tarjeta de credito|rappicard/i.test(text)) {
+    isTarjetaCredito = true;
+    tarjetaNombre = 'Infinity';
+    tarjetaFila = 8;
+  }
 
   // 5. TIPO DE ACCIÓN BANCARIA
   let tipoTransaccion: 'compra' | 'transferencia' | 'recarga' | 'retiro' | 'pago_credito' | 'compra_tc' = 'compra';
@@ -290,9 +349,9 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
 
   let mensajeAccion = undefined;
   if (tipoTransaccion === 'compra_tc') {
-    mensajeAccion = `💳 Compra con Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Suma a tu deuda en la celda I8 (Fila 8) y NO se descuenta de tu cuenta de ahorros de Manejo.`;
+    mensajeAccion = `💳 Compra con Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Suma a tu deuda en la celda I${tarjetaFila} (Fila ${tarjetaFila}) y NO se descuenta de tu cuenta de ahorros de Manejo.`;
   } else if (tipoTransaccion === 'pago_credito') {
-    mensajeAccion = `💳 Pago a Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Se descuenta de tu saldo de Manejo y disminuye la deuda de tu tarjeta.`;
+    mensajeAccion = `💳 Pago a Tarjeta de Crédito ${tarjetaNombre} (${tarjetaRef || 'TC'}): Se descuenta de tu saldo de Manejo (Deudas tarjetas) y disminuye la deuda de tu tarjeta en celda I${tarjetaFila}.`;
   }
 
   return {
@@ -306,6 +365,7 @@ export function parseBankSMS(rawText: string): ParsedBankSMS | null {
     isTarjetaCredito,
     tarjetaRef,
     tarjetaNombre,
+    tarjetaFila,
     confianza,
     mensajeAccion
   };

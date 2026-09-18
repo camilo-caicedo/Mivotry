@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { CONFIG } from '../config';
 import { MivotryAPI, NotificacionPendienteItem, DashboardResponse } from '../services/api';
+import { parseBankSMS } from '../services/smsParser';
 
 interface Props {
   visible: boolean;
@@ -88,9 +89,12 @@ export const NotificationsInboxModal: React.FC<Props> = ({
   const handleAprobarItem = async (item: NotificacionPendienteItem) => {
     try {
       setProcessingId(item.id);
-      const isTC = item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
+      const parsed = parseBankSMS(item.textoOriginal);
+      const isTC = parsed?.isTarjetaCredito || item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
       const cat = isTC ? 'Deudas tarjetas' : (selectedCategories[item.id] || item.categoriaSugerida || 'Salidas 1');
       const acc = isTC ? 'tarjeta_credito' : (selectedAccounts[item.id] || (item.cuentaSugerida as 'nomina' | 'bonos') || 'nomina');
+      const tarjetaNombre = parsed?.tarjetaNombre || (item.textoOriginal.includes('0899') ? 'Rappi' : item.textoOriginal.includes('5248') ? 'Scotia' : item.textoOriginal.includes('2545') ? 'Falabella' : 'Infinity');
+      const tarjetaFila = parsed?.tarjetaFila || (tarjetaNombre === 'Rappi' ? 9 : tarjetaNombre === 'Scotia' ? 10 : tarjetaNombre === 'Falabella' ? 11 : 8);
 
       const res = await MivotryAPI.procesarNotificacionPendiente({
         id: item.id,
@@ -98,7 +102,11 @@ export const NotificationsInboxModal: React.FC<Props> = ({
         categoria: cat,
         cuenta: acc as any,
         monto: item.monto,
-        concepto: item.comercio || `Gasto ${item.entidad}`
+        concepto: item.comercio || `Gasto ${item.entidad}`,
+        tarjeta: tarjetaNombre,
+        fila: tarjetaFila,
+        isTarjetaCredito: isTC,
+        tipoTransaccion: parsed?.tipoTransaccion
       });
 
       if (res && res.success) {
@@ -386,7 +394,11 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                 const currentCat = selectedCategories[item.id] || item.categoriaSugerida || 'Salidas 1';
                 const currentAcc = selectedAccounts[item.id] || (item.cuentaSugerida as 'nomina' | 'bonos') || 'nomina';
 
-                const isItemTC = item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
+                const parsed = parseBankSMS(item.textoOriginal);
+                const isItemTC = parsed?.isTarjetaCredito || item.cuentaSugerida === 'tarjeta_credito' || item.categoriaSugerida === 'Deudas tarjetas' || /t\.cred|tarjeta de credito/i.test(item.textoOriginal);
+                const tcName = parsed?.tarjetaNombre || (item.textoOriginal.includes('0899') ? 'Rappi' : item.textoOriginal.includes('5248') ? 'Scotia' : item.textoOriginal.includes('2545') ? 'Falabella' : 'Infinity');
+                const tcFila = parsed?.tarjetaFila || (tcName === 'Rappi' ? 9 : tcName === 'Scotia' ? 10 : tcName === 'Falabella' ? 11 : 8);
+                const tcRef = parsed?.tarjetaRef || (item.textoOriginal.includes('0899') ? '*0899' : item.textoOriginal.includes('5248') ? '*5248' : item.textoOriginal.includes('2545') ? '*2545' : '*2068');
 
                 return (
                   <View key={item.id} style={styles.itemCard}>
@@ -423,7 +435,7 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                       {isItemTC ? (
                         <View style={styles.tcBadgeBox}>
                           <CreditCard size={13} color="#F59E0B" />
-                          <Text style={styles.tcBadgeText}>Tarjeta Infinity</Text>
+                          <Text style={styles.tcBadgeText}>{tcName} ({tcRef})</Text>
                         </View>
                       ) : (
                         <View style={styles.accountPillBox}>
@@ -451,7 +463,7 @@ export const NotificationsInboxModal: React.FC<Props> = ({
                     {isItemTC ? (
                       <View style={styles.tcNoticeRow}>
                         <Text style={styles.tcNoticeRowText}>
-                          🛡️ Suma a Deuda en celda I8 (Fila 8). No descuenta de Manejo.
+                          🛡️ Suma a Deuda {tcName} en celda I{tcFila} (Fila {tcFila}). No descuenta de Manejo.
                         </Text>
                       </View>
                     ) : (

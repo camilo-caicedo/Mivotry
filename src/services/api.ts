@@ -211,20 +211,19 @@ export const MivotryAPI = {
     id: string;
     accion: 'aprobar' | 'descartar';
     categoria?: string;
-    cuenta?: 'nomina' | 'bonos';
+    cuenta?: 'nomina' | 'bonos' | 'tarjeta_credito';
     monto?: number;
     concepto?: string;
+    tarjeta?: string;
+    fila?: number;
+    isTarjetaCredito?: boolean;
+    tipoTransaccion?: string;
   }) {
     const res = await fetch(CONFIG.API_URL, {
       method: 'POST',
       body: JSON.stringify({
         action: 'procesarNotificacionPendiente',
-        id: params.id,
-        accion: params.accion,
-        categoria: params.categoria,
-        cuenta: params.cuenta,
-        monto: params.monto,
-        concepto: params.concepto
+        ...params
       })
     });
     return await res.json();

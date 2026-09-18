@@ -114,7 +114,7 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
       // CASO COMPRA CON TARJETA DE CRÉDITO (T.Cred)
       if (parsedResult.isTarjetaCredito && parsedResult.tipoTransaccion === 'compra_tc') {
         const tarjeta = parsedResult.tarjetaNombre || 'Infinity';
-        const filaTC = tarjeta.toLowerCase().includes('infinity') ? 8 : (tarjeta.toLowerCase().includes('rappi') ? 9 : (tarjeta.toLowerCase().includes('scotia') ? 10 : 11));
+        const filaTC = parsedResult.tarjetaFila || (tarjeta.toLowerCase().includes('infinity') ? 8 : (tarjeta.toLowerCase().includes('rappi') ? 9 : (tarjeta.toLowerCase().includes('scotia') ? 10 : 11)));
         const conceptoFinal = `${customConcepto || parsedResult.comercio} (TC ${parsedResult.tarjetaRef || ''})`.trim();
 
         await MivotryAPI.actualizarSaldoTarjetaCredito({
@@ -160,8 +160,10 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
       // Si fue un pago a la tarjeta de crédito desde la cuenta, descontar también de la deuda de la tarjeta
       if (parsedResult.tipoTransaccion === 'pago_credito') {
         const tarjeta = parsedResult.tarjetaNombre || 'Infinity';
+        const filaTC = parsedResult.tarjetaFila || 8;
         await MivotryAPI.actualizarSaldoTarjetaCredito({
           tarjeta: tarjeta,
+          fila: filaTC,
           monto: parsedResult.monto,
           operacion: 'restar',
           concepto: `Abono/Pago a TC ${tarjeta}`
@@ -328,8 +330,8 @@ export const SMSDetectorModal: React.FC<SMSDetectorModalProps> = ({
                           </Text>
                           <Text style={styles.tcNoticeDesc}>
                             {parsedResult.tipoTransaccion === 'compra_tc'
-                              ? `Suma ${formatCOP(parsedResult.monto)} a tu deuda en la celda I8 y NO descuenta de tu saldo de Manejo.`
-                              : `Pago a tarjeta: Se descuenta de tu saldo de Manejo y disminuye la deuda.`}
+                              ? `Suma ${formatCOP(parsedResult.monto)} a tu deuda en la celda I${parsedResult.tarjetaFila || 8} (Fila ${parsedResult.tarjetaFila || 8}) y NO descuenta de tu saldo de Manejo.`
+                              : `Pago a tarjeta: Se descuenta de tu saldo de Manejo (Deudas tarjetas) y disminuye tu deuda en celda I${parsedResult.tarjetaFila || 8}.`}
                           </Text>
                         </View>
                       </View>

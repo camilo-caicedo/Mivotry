@@ -662,30 +662,32 @@ function actualizarSaldoTarjetaCredito(payload) {
     targetRow = tarjetaFila;
     targetName = sheet.getRange("H" + targetRow).getValue();
   } else {
-    const rows = sheet.getRange("H8:J11").getValues();
-    for (let i = 0; i < rows.length; i++) {
-      const name = String(rows[i][0] || "").trim().toLowerCase();
-      if (name && (name.includes(tarjetaNombre) || tarjetaNombre.includes(name))) {
-        targetRow = 8 + i;
-        targetName = rows[i][0];
-        break;
-      }
-    }
-  }
-  
-  if (!targetRow) {
-    const rows = sheet.getRange("H8:J11").getValues();
-    for (let i = 0; i < rows.length; i++) {
-      const name = String(rows[i][0] || "").trim().toLowerCase();
-      if (
-        ((tarjetaNombre.includes("infinity") || tarjetaNombre.includes("2068") || tarjetaNombre.includes("bancolombia")) && name.includes("infinity")) ||
-        (tarjetaNombre.includes("rappi") && name.includes("rappi")) ||
-        ((tarjetaNombre.includes("scotia") || tarjetaNombre.includes("colpatria")) && name.includes("scotia")) ||
-        (tarjetaNombre.includes("falabella") && name.includes("falabella"))
-      ) {
-        targetRow = 8 + i;
-        targetName = rows[i][0];
-        break;
+    // Mapeo exacto por dígitos o nombre del usuario:
+    // *2068 -> Infinity (Fila 8)
+    // *0899 -> Rappi (Fila 9)
+    // *5248 -> Scotia o Davibank (Fila 10)
+    // *2545 -> Falabella (Fila 11)
+    if (tarjetaNombre.includes("2068") || tarjetaNombre.includes("infinity")) {
+      targetRow = 8;
+      targetName = "Infinity";
+    } else if (tarjetaNombre.includes("0899") || tarjetaNombre.includes("rappi")) {
+      targetRow = 9;
+      targetName = "Rappi";
+    } else if (tarjetaNombre.includes("5248") || tarjetaNombre.includes("scotia") || tarjetaNombre.includes("davibank") || tarjetaNombre.includes("colpatria")) {
+      targetRow = 10;
+      targetName = "Scotia";
+    } else if (tarjetaNombre.includes("2545") || tarjetaNombre.includes("falabella") || tarjetaNombre.includes("cmr")) {
+      targetRow = 11;
+      targetName = "Falabella";
+    } else {
+      const rows = sheet.getRange("H8:J11").getValues();
+      for (let i = 0; i < rows.length; i++) {
+        const name = String(rows[i][0] || "").trim().toLowerCase();
+        if (name && (name.includes(tarjetaNombre) || tarjetaNombre.includes(name))) {
+          targetRow = 8 + i;
+          targetName = rows[i][0];
+          break;
+        }
       }
     }
   }
@@ -761,12 +763,20 @@ function parseSMSBancario(payload) {
   }
   
   // Detección de Tarjeta de Crédito (T.Cred)
-  if (/t\.cred|tarjeta de credito|visa oro|rappicard/i.test(sms)) {
+  // Mapeo exacto del usuario:
+  // *2068 -> Infinity (Fila 8)
+  // *0899 -> Rappi (Fila 9)
+  // *5248 -> Scotia o Davibank (Fila 10)
+  // *2545 -> Falabella (Fila 11)
+  // *3839 / T.Deb -> Débito Ahorros (Manejo regular)
+  // *1493 -> Cuenta Ahorros (Manejo regular)
+  const isDebitoAhorros = /3839|1493|t\.deb/i.test(sms);
+  if (!isDebitoAhorros && (/t\.cred|tarjeta de credito|visa oro|rappicard|cmr/i.test(sms) || /2068|0899|5248|2545/.test(sms))) {
     isTarjetaCredito = true;
     if (/2068|infinity/i.test(sms)) tarjetaNombre = "Infinity";
-    else if (/rappi/i.test(sms)) tarjetaNombre = "Rappi";
-    else if (/scotia|colpatria/i.test(sms)) tarjetaNombre = "Scotia";
-    else if (/falabella/i.test(sms)) tarjetaNombre = "Falabella";
+    else if (/0899|rappi/i.test(sms)) tarjetaNombre = "Rappi";
+    else if (/5248|scotia|colpatria|davibank/i.test(sms)) tarjetaNombre = "Scotia";
+    else if (/2545|falabella|cmr/i.test(sms)) tarjetaNombre = "Falabella";
     else tarjetaNombre = "Infinity"; // default Bancolombia
     
     // Si NO es pago de tarjeta, es COMPRA con TC:
@@ -1006,14 +1016,38 @@ function procesarNotificacionPendiente(payload) {
   const cuenta = payload.cuenta || pSheet.getRange(targetRow, 8).getValue();
   const monto = payload.monto || cleanNumber(pSheet.getRange(targetRow, 5).getValue());
   const comercio = payload.concepto || pSheet.getRange(targetRow, 6).getValue();
-  
-  // Si la cuenta o categoría es de tarjeta de crédito (NO descuenta de Manejo, SUMA a deuda de la TC):
-  if (cuenta === "tarjeta_credito" || categoria === "Deudas tarjetas" || String(payload.isTarjetaCredito) === "true") {
+  const textoOriginal = String(pSheet.getRange(targetRow, 4).getValue() || "");
+
+  // Detectar si es pago a tarjeta de crédito (desde cuenta de ahorros)
+  const isPagoCredito = /pagaste.*tarjeta/i.test(textoOriginal) || String(payload.tipoTransaccion) === "pago_credito";
+
+  // Detectar si es compra con tarjeta de crédito (suma a deuda TC, NO descuenta de Manejo)
+  const isDebitoAhorros = /3839|1493|t\.deb/i.test(textoOriginal);
+  const isCompraTC = !isDebitoAhorros && !isPagoCredito && (
+    cuenta === "tarjeta_credito" ||
+    categoria === "Deudas tarjetas" ||
+    String(payload.isTarjetaCredito) === "true" ||
+    /t\.cred|tarjeta de credito|rappicard|cmr/i.test(textoOriginal) ||
+    /2068|0899|5248|2545/.test(textoOriginal)
+  );
+
+  if (isCompraTC) {
+    let targetRowTC = payload.fila || null;
+    let tcName = payload.tarjeta || "";
+    
+    if (!targetRowTC) {
+      if (/0899|rappi/i.test(textoOriginal)) { targetRowTC = 9; tcName = "Rappi"; }
+      else if (/5248|scotia|davibank|colpatria/i.test(textoOriginal)) { targetRowTC = 10; tcName = "Scotia"; }
+      else if (/2545|falabella|cmr/i.test(textoOriginal)) { targetRowTC = 11; tcName = "Falabella"; }
+      else { targetRowTC = 8; tcName = "Infinity"; }
+    }
+
     const resTC = actualizarSaldoTarjetaCredito({
-      tarjeta: payload.tarjeta || comercio || "Infinity",
+      tarjeta: tcName,
+      fila: targetRowTC,
       monto: monto,
       operacion: "sumar",
-      concepto: comercio || ("Consumo TC (" + categoria + ")"),
+      concepto: comercio || ("Consumo TC " + tcName),
       origen: "notificacion_tc_aprobada"
     });
     
@@ -1030,6 +1064,45 @@ function procesarNotificacionPendiente(payload) {
       accion: "aprobado",
       tipo: "tarjeta_credito",
       tarjetaCredito: resTC
+    };
+  }
+
+  if (isPagoCredito) {
+    // 1) Descuenta de Manejo en categoría "Deudas tarjetas"
+    const resGasto = registrarGasto({
+      cuenta: "nomina",
+      categoria: "Deudas tarjetas",
+      monto: monto,
+      concepto: comercio || "Pago Tarjeta de Crédito",
+      origen: "notificacion_pago_tc"
+    });
+
+    // 2) Disminuye la deuda de la tarjeta correspondiente
+    let targetRowTC = payload.fila || null;
+    if (!targetRowTC) {
+      if (/0899|rappi/i.test(textoOriginal)) targetRowTC = 9;
+      else if (/5248|scotia|davibank|colpatria/i.test(textoOriginal)) targetRowTC = 10;
+      else if (/2545|falabella|cmr/i.test(textoOriginal)) targetRowTC = 11;
+      else targetRowTC = 8;
+    }
+
+    actualizarSaldoTarjetaCredito({
+      fila: targetRowTC,
+      monto: monto,
+      operacion: "restar",
+      concepto: "Abono pago TC",
+      origen: "notificacion_pago_tc"
+    });
+
+    pSheet.getRange(targetRow, 9).setValue("Aprobado");
+    pSheet.getRange(targetRow, 10).setValue(fechaProcesado);
+
+    return {
+      success: true,
+      id: id,
+      accion: "aprobado",
+      tipo: "pago_credito",
+      gasto: resGasto
     };
   }
   
