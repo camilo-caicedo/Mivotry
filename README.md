@@ -107,3 +107,17 @@ graph TD
 * **Alerta de Saldo Crítico ("Gatito Alerta"):** Notificación push local si una categoría de `Manejo` cae por debajo del 15% antes de la próxima quincena.
 * **Recordatorio de Vencimientos:** Alertas 3 días antes de las cuotas de créditos o fechas de pago de streaming.
 * **Notificación de Cierre de Quincena:** Recordatorio el día 14 y el día 29 con el balance que vas a trasladar a la siguiente quincena.
+
+### 7. 📲 Captura Automática de Gastos por SMS y Notificaciones Bancarias (Android Native)
+* **Integración con Google Messages (SMS Broadcast Receiver):**
+  * Escucha en segundo plano los mensajes de texto entrantes de entidades bancarias colombianas (Banco de Bogotá, Scotiabank Colpatria, Bancolombia, RappiCard, Falabella, Davivienda, etc.).
+* **Parser Inteligente de Transacciones:**
+  * Detecta automáticamente: **Monto**, **Comercio/Concepto** (ej. *Texaco, Éxito, D1*), **Fecha** y **Medio de pago** (débito, crédito terminada en *XXXX).
+* **Confirmación Asistida en 1 Toque (Semi-automática):**
+  * Al recibir una compra, Mivotry lanza una alerta flotante o notificación interactiva:
+    > 🐾 **Mivotry**: *¿Registrar gasto de $45.000 en Gasolina (Banco de Bogotá)?*
+    > `[ ✅ Confirmar ]` `[ ✏️ Cambiar categoría ]` `[ ❌ Ignorar ]`
+  * Al presionar **Confirmar**, se actualiza inmediatamente la celda correspondiente en `Manejo` y se guarda en `Transacciones_Log` sin necesidad de abrir la app.
+* **Requisito Técnico:**
+  * Implementación mediante **Expo Prebuild / Development Build** con permisos nativos de Android: `RECEIVE_SMS` y `READ_SMS`, asegurando compatibilidad total con Google Messages y Android 10+.
+
