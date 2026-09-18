@@ -17,9 +17,17 @@
 
 const SHEET_NAME_GASTOS = "Gastos";
 const SHEET_NAME_LOGS = "Transacciones_Log";
+const SHEET_NAME_PENDIENTES = "Notificaciones_Pendientes";
 
 function doGet(e) {
   try {
+    if (e && e.parameter && (e.parameter.action === "recibirNotificacionExterna" || e.parameter.texto || e.parameter.sms)) {
+      const res = recibirNotificacionExterna({
+        texto: e.parameter.texto || e.parameter.sms || "",
+        origen: e.parameter.origen || "get_webhook"
+      });
+      return createJsonResponse(res);
+    }
     const data = getDashboardData();
     return createJsonResponse({ success: true, data: data });
   } catch (error) {
@@ -34,7 +42,7 @@ function doPost(e) {
       contents = JSON.parse(e.postData.contents);
     }
     
-    const action = contents.action || "getDashboard";
+    const action = contents.action || (contents.texto ? "recibirNotificacionExterna" : "getDashboard");
     
     switch (action) {
       case "getDashboard":
@@ -63,6 +71,21 @@ function doPost(e) {
         
       case "parseSMS":
         return createJsonResponse(parseSMSBancario(contents));
+        
+      case "recibirNotificacionExterna":
+        return createJsonResponse(recibirNotificacionExterna(contents));
+        
+      case "encolarNotificacionesMultiples":
+        return createJsonResponse(encolarNotificacionesMultiples(contents));
+        
+      case "getNotificacionesPendientes":
+        return createJsonResponse(getNotificacionesPendientes());
+        
+      case "procesarNotificacionPendiente":
+        return createJsonResponse(procesarNotificacionPendiente(contents));
+        
+      case "aprobarLoteNotificaciones":
+        return createJsonResponse(aprobarLoteNotificaciones(contents));
         
       default:
         return createJsonResponse({ success: false, error: "Acción no reconocida: " + action });
@@ -275,7 +298,17 @@ function getDashboardData() {
       totalRendimientos: totalCompleto,
       items: detalleBolsillos
     },
-    pagosAnuales: pagosAnuales
+    pagosAnuales: pagosAnuales,
+    totalNotificacionesPendientes: (function() {
+      const pSheet = ss.getSheetByName(SHEET_NAME_PENDIENTES);
+      if (!pSheet || pSheet.getLastRow() <= 1) return 0;
+      const estados = pSheet.getRange(2, 9, pSheet.getLastRow() - 1, 1).getValues();
+      let count = 0;
+      for (let i = 0; i < estados.length; i++) {
+        if (String(estados[i][0]).toLowerCase().trim() === "pendiente") count++;
+      }
+      return count;
+    })()
   };
 }
 
@@ -688,3 +721,183 @@ function logTransaction(ss, data) {
     data.origen || "app"
   ]);
 }
+
+/**
+ * =========================================================================
+ * 8. BANDEJA DE NOTIFICACIONES PENDIENTES (INBOX WEBHOOK / LOTE)
+ * =========================================================================
+ */
+function ensurePendientesSheetExists(ss) {
+  let pSheet = ss.getSheetByName(SHEET_NAME_PENDIENTES);
+  if (!pSheet) {
+    pSheet = ss.insertSheet(SHEET_NAME_PENDIENTES);
+    pSheet.appendRow([
+      "ID",
+      "FechaHora",
+      "Entidad",
+      "TextoOriginal",
+      "Monto",
+      "Comercio",
+      "CategoriaSugerida",
+      "CuentaSugerida",
+      "Estado",
+      "FechaProcesado"
+    ]);
+    pSheet.getRange("A1:J1").setFontWeight("bold").setBackground("#0B2B33").setFontColor("#FFFFFF");
+  }
+  return pSheet;
+}
+
+function recibirNotificacionExterna(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const pSheet = ensurePendientesSheetExists(ss);
+  
+  const texto = String(payload.texto || payload.sms || "").trim();
+  if (!texto) return { success: false, error: "Texto de notificación vacío" };
+  
+  const parsed = parseSMSBancario({ sms: texto }).parseResult;
+  const now = new Date();
+  const id = "NOTIF_" + now.getTime() + "_" + Math.floor(Math.random() * 1000);
+  const fechaHora = Utilities.formatDate(now, "America/Bogota", "yyyy-MM-dd HH:mm:ss");
+  
+  pSheet.appendRow([
+    id,
+    fechaHora,
+    parsed.entidad || "Desconocido",
+    texto,
+    parsed.monto || 0,
+    parsed.comercio || "",
+    parsed.categoriaSugerida || "Salidas 1",
+    parsed.cuentaSugerida || "nomina",
+    "Pendiente",
+    ""
+  ]);
+  
+  return {
+    success: true,
+    notificacion: {
+      id: id,
+      fechaHora: fechaHora,
+      entidad: parsed.entidad,
+      textoOriginal: texto,
+      monto: parsed.monto,
+      comercio: parsed.comercio,
+      categoriaSugerida: parsed.categoriaSugerida,
+      cuentaSugerida: parsed.cuentaSugerida,
+      estado: "Pendiente"
+    }
+  };
+}
+
+function encolarNotificacionesMultiples(payload) {
+  const textos = payload.textos || [];
+  const resultados = [];
+  for (let i = 0; i < textos.length; i++) {
+    const txt = String(textos[i]).trim();
+    if (txt) {
+      resultados.push(recibirNotificacionExterna({ texto: txt, origen: payload.origen || "lote_app" }));
+    }
+  }
+  return { success: true, totalEncoladas: resultados.length, items: resultados };
+}
+
+function getNotificacionesPendientes() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const pSheet = ensurePendientesSheetExists(ss);
+  const lastRow = pSheet.getLastRow();
+  if (lastRow <= 1) return { success: true, total: 0, pendientes: [] };
+  
+  const values = pSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+  const pendientes = [];
+  
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const estado = String(row[8] || "").trim();
+    if (estado.toLowerCase() === "pendiente") {
+      pendientes.push({
+        filaHoja: i + 2,
+        id: String(row[0]),
+        fechaHora: String(row[1]),
+        entidad: String(row[2]),
+        textoOriginal: String(row[3]),
+        monto: cleanNumber(row[4]),
+        comercio: String(row[5]),
+        categoriaSugerida: String(row[6]),
+        cuentaSugerida: String(row[7]),
+        estado: estado
+      });
+    }
+  }
+  
+  return { success: true, total: pendientes.length, pendientes: pendientes };
+}
+
+function procesarNotificacionPendiente(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const pSheet = ensurePendientesSheetExists(ss);
+  const id = String(payload.id || "").trim();
+  const accion = String(payload.accion || "aprobar").toLowerCase(); // "aprobar" o "descartar"
+  
+  const lastRow = pSheet.getLastRow();
+  if (lastRow <= 1) return { success: false, error: "No hay notificaciones registradas" };
+  
+  const ids = pSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  let targetRow = null;
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) {
+      targetRow = i + 2;
+      break;
+    }
+  }
+  
+  if (!targetRow) {
+    return { success: false, error: "Notificación no encontrada con id: " + id };
+  }
+  
+  const now = new Date();
+  const fechaProcesado = Utilities.formatDate(now, "America/Bogota", "yyyy-MM-dd HH:mm:ss");
+  
+  if (accion === "descartar") {
+    pSheet.getRange(targetRow, 9).setValue("Descartado");
+    pSheet.getRange(targetRow, 10).setValue(fechaProcesado);
+    return { success: true, id: id, accion: "descartado" };
+  }
+  
+  // Si es aprobar:
+  const categoria = payload.categoria || pSheet.getRange(targetRow, 7).getValue();
+  const cuenta = payload.cuenta || pSheet.getRange(targetRow, 8).getValue();
+  const monto = payload.monto || cleanNumber(pSheet.getRange(targetRow, 5).getValue());
+  const comercio = payload.concepto || pSheet.getRange(targetRow, 6).getValue();
+  
+  const resGasto = registrarGasto({
+    cuenta: cuenta,
+    categoria: categoria,
+    monto: monto,
+    concepto: comercio || ("Notificación SMS (" + categoria + ")"),
+    origen: "notificacion_aprobada"
+  });
+  
+  if (!resGasto.success) {
+    return { success: false, error: "Error al aplicar gasto en hoja: " + resGasto.error };
+  }
+  
+  pSheet.getRange(targetRow, 9).setValue("Aprobado");
+  pSheet.getRange(targetRow, 10).setValue(fechaProcesado);
+  
+  return {
+    success: true,
+    id: id,
+    accion: "aprobado",
+    gasto: resGasto
+  };
+}
+
+function aprobarLoteNotificaciones(payload) {
+  const ids = payload.ids || [];
+  const resultados = [];
+  for (let i = 0; i < ids.length; i++) {
+    resultados.push(procesarNotificacionPendiente({ id: ids[i], accion: "aprobar" }));
+  }
+  return { success: true, total: resultados.length, resultados: resultados };
+}
+

@@ -24,6 +24,19 @@ export interface PagoAnualItem {
   estado: string;
 }
 
+export interface NotificacionPendienteItem {
+  filaHoja: number;
+  id: string;
+  fechaHora: string;
+  entidad: string;
+  textoOriginal: string;
+  monto: number;
+  comercio: string;
+  categoriaSugerida: string;
+  cuentaSugerida: string;
+  estado: 'Pendiente' | 'Aprobado' | 'Descartado';
+}
+
 export interface DashboardResponse {
   nomina: {
     quincenaBase: number;
@@ -66,6 +79,7 @@ export interface DashboardResponse {
     }>;
   };
   pagosAnuales: PagoAnualItem[];
+  totalNotificacionesPendientes?: number;
 }
 
 export const MivotryAPI = {
@@ -166,6 +180,86 @@ export const MivotryAPI = {
         action: 'actualizarEstadoPagoAnual',
         fila: params.fila,
         estado: params.estado
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Obtiene la lista de notificaciones y SMS bancarios pendientes por aprobar
+   */
+  async getNotificacionesPendientes(): Promise<{ success: boolean; total: number; pendientes: NotificacionPendienteItem[] }> {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'getNotificacionesPendientes' })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Procesa una notificación individual (aprobar o descartar)
+   */
+  async procesarNotificacionPendiente(params: {
+    id: string;
+    accion: 'aprobar' | 'descartar';
+    categoria?: string;
+    cuenta?: 'nomina' | 'bonos';
+    monto?: number;
+    concepto?: string;
+  }) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'procesarNotificacionPendiente',
+        id: params.id,
+        accion: params.accion,
+        categoria: params.categoria,
+        cuenta: params.cuenta,
+        monto: params.monto,
+        concepto: params.concepto
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Aprueba un lote de notificaciones en 1 solo paso
+   */
+  async aprobarLoteNotificaciones(ids: string[]) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'aprobarLoteNotificaciones',
+        ids
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Encola múltiples notificaciones pegadas en bloque
+   */
+  async encolarNotificacionesMultiples(textos: string[]) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'encolarNotificacionesMultiples',
+        textos
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Encola una notificación individual recibida de MacroDroid, Tasker o webhook
+   */
+  async recibirNotificacionExterna(texto: string, origen: string = 'app') {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'recibirNotificacionExterna',
+        texto,
+        origen
       })
     });
     return await res.json();

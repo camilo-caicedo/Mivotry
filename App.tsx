@@ -38,7 +38,8 @@ import {
   Smartphone,
   ArrowRight,
   ShieldCheck,
-  Clock
+  Clock,
+  Inbox
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +47,7 @@ import { CONFIG } from './src/config';
 import { MivotryAPI, DashboardResponse, GastoItem, PagoAnualItem } from './src/services/api';
 import { ChatAssistant } from './src/components/ChatAssistant';
 import { SMSDetectorModal } from './src/components/SMSDetectorModal';
+import { NotificationsInboxModal } from './src/components/NotificationsInboxModal';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +74,7 @@ export default function App() {
   const [primaModalVisible, setPrimaModalVisible] = useState(false);
   const [primaInputMonto, setPrimaInputMonto] = useState('');
   const [submittingPrima, setSubmittingPrima] = useState(false);
+  const [inboxModalVisible, setInboxModalVisible] = useState(false);
 
   const handleInyectarPrima = async () => {
     const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
@@ -338,10 +341,18 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => setSmsModalVisible(true)}
+            onPress={() => setInboxModalVisible(true)}
           >
-            <Bell size={19} color={CONFIG.COLORS.textLight} />
-            <View style={styles.badgeNotification} />
+            <Inbox size={19} color={CONFIG.COLORS.textLight} />
+            {(dashboardData?.totalNotificacionesPendientes || 0) > 0 ? (
+              <View style={styles.badgeNotificationCount}>
+                <Text style={styles.badgeNotificationText}>
+                  {dashboardData?.totalNotificacionesPendientes}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.badgeNotification} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -361,6 +372,33 @@ export default function App() {
         >
           {activeTab === 'dashboard' && (
           <View style={styles.tabContainer}>
+            {/* BANNER NOTIFICACIONES PENDIENTES */}
+            {(dashboardData?.totalNotificacionesPendientes || 0) > 0 && (
+              <TouchableOpacity
+                style={styles.pendingInboxBanner}
+                activeOpacity={0.85}
+                onPress={() => setInboxModalVisible(true)}
+              >
+                <View style={styles.pendingInboxLeft}>
+                  <View style={styles.pendingInboxIconBox}>
+                    <Bell size={16} color="#06181D" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pendingInboxTitle}>
+                      Tienes {dashboardData?.totalNotificacionesPendientes} {dashboardData?.totalNotificacionesPendientes === 1 ? 'gasto pendiente' : 'gastos pendientes'}
+                    </Text>
+                    <Text style={styles.pendingInboxSubtitle}>
+                      Notificaciones bancarias esperando tu aprobación
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.pendingInboxBtn}>
+                  <Text style={styles.pendingInboxBtnText}>Aprobar</Text>
+                  <ArrowRight size={13} color="#10B981" />
+                </View>
+              </TouchableOpacity>
+            )}
+
             {/* HERO CARD DE SALDOS */}
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
@@ -1257,6 +1295,14 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* BANDEJA DE ENTRADA DE NOTIFICACIONES PENDIENTES */}
+      <NotificationsInboxModal
+        visible={inboxModalVisible}
+        onClose={() => setInboxModalVisible(false)}
+        dashboardData={dashboardData}
+        onGastosActualizados={fetchDashboard}
+      />
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -1331,6 +1377,78 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: '#10B981'
+  },
+  badgeNotificationCount: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#F59E0B',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#06181D'
+  },
+  badgeNotificationText: {
+    color: '#06181D',
+    fontSize: 9,
+    fontWeight: '900'
+  },
+  pendingInboxBanner: {
+    backgroundColor: '#0F3741',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B'
+  },
+  pendingInboxLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1
+  },
+  pendingInboxIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F59E0B',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  pendingInboxTitle: {
+    color: '#F1F5F9',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  pendingInboxSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 1
+  },
+  pendingInboxBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  pendingInboxBtnText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700'
   },
   scrollContent: {
     flex: 1
