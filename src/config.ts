@@ -3,7 +3,7 @@
  */
 export const CONFIG = {
   APP_NAME: 'Mivotry',
-  API_URL: 'https://script.google.com/macros/s/AKfycbyPPsZIWDZa4ajd_poGVRH6UsC0tgGD-JxuGU16S6JR-C2EFRR5EiVDNypnn6JCHdwX/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxV-yscl8uxhTTlTNh0miPKI-IqFB3tRhfByXcdkLU87yxujqnrni9-woyKAMMmcHZi/exec',
   COLORS: {
     primary: '#0B2B33',
     backgroundDark: '#06181D',
