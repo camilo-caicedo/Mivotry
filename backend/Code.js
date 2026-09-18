@@ -58,6 +58,9 @@ function doPost(e) {
       case "actualizarAhorroPagosAnuales":
         return createJsonResponse(actualizarAhorroPagosAnuales(contents));
         
+      case "actualizarEstadoPagoAnual":
+        return createJsonResponse(actualizarEstadoPagoAnual(contents));
+        
       case "parseSMS":
         return createJsonResponse(parseSMSBancario(contents));
         
@@ -220,7 +223,7 @@ function getDashboardData() {
     const nombre = String(row[0] || "").trim();
     if (!nombre || nombre === "Total") continue;
     
-    const rowNumber = 24 + i;
+    const rowNumber = 25 + i;
     const costoEstimado = cleanNumber(row[1]);
     const ahorrado = cleanNumber(row[2]);
     const mesPago = String(row[3] || "").trim();
@@ -523,7 +526,7 @@ function actualizarAhorroPagosAnuales(payload) {
   const monto = Number(payload.monto) || 0;
   const modo = payload.modo || "sumar";
   
-  const cell = sheet.getRange("I28");
+  const cell = sheet.getRange("I29");
   const actual = cleanNumber(cell.getValue());
   const nuevo = (modo === "sumar") ? actual + monto : monto;
   
@@ -539,6 +542,38 @@ function actualizarAhorroPagosAnuales(payload) {
   });
   
   return { success: true, saldoAnterior: actual, nuevoSaldo: nuevo };
+}
+
+/**
+ * =========================================================================
+ * 6B. ACTUALIZAR ESTADO DE PAGO ANUAL (PAGADO / PENDIENTE)
+ * =========================================================================
+ */
+function actualizarEstadoPagoAnual(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+  const fila = Number(payload.fila);
+  const nuevoEstado = String(payload.estado || "Pagado").trim();
+  
+  if (fila < 25 || fila > 29) {
+    return { success: false, error: "Fila inválida para pago anual (debe ser entre 25 y 29)" };
+  }
+  
+  sheet.getRange("O" + fila).setValue(nuevoEstado);
+  
+  const concepto = sheet.getRange("K" + fila).getValue();
+  const costo = sheet.getRange("L" + fila).getValue();
+  
+  logTransaction(ss, {
+    cuenta: "pagos_anuales",
+    categoria: "Pagos Anuales",
+    concepto: `Pago anual: ${concepto} (${costo}) marcado como ${nuevoEstado}`,
+    monto: cleanNumber(costo),
+    saldoRestante: 0,
+    origen: payload.origen || "app"
+  });
+  
+  return { success: true, fila: fila, concepto: concepto, nuevoEstado: nuevoEstado };
 }
 
 /**

@@ -36,12 +36,14 @@ import {
   Plus,
   ChevronDown,
   Smartphone,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Clock
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CONFIG } from './src/config';
-import { MivotryAPI, DashboardResponse, GastoItem } from './src/services/api';
+import { MivotryAPI, DashboardResponse, GastoItem, PagoAnualItem } from './src/services/api';
 import { ChatAssistant } from './src/components/ChatAssistant';
 import { SMSDetectorModal } from './src/components/SMSDetectorModal';
 
@@ -67,6 +69,62 @@ export default function App() {
   const [conceptoInput, setConceptoInput] = useState('');
   const [submittingExpense, setSubmittingExpense] = useState(false);
   const [smsModalVisible, setSmsModalVisible] = useState(false);
+  const [primaModalVisible, setPrimaModalVisible] = useState(false);
+  const [primaInputMonto, setPrimaInputMonto] = useState('');
+  const [submittingPrima, setSubmittingPrima] = useState(false);
+
+  const handleInyectarPrima = async () => {
+    const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
+    if (!monto || monto <= 0) {
+      Alert.alert('Monto inválido', 'Por favor ingresa un monto mayor a cero para la prima.');
+      return;
+    }
+    try {
+      setSubmittingPrima(true);
+      await MivotryAPI.actualizarAhorroPagosAnuales({
+        monto,
+        modo: 'sumar',
+        concepto: 'Inyección Prima Semestral'
+      });
+      setSubmittingPrima(false);
+      setPrimaModalVisible(false);
+      setPrimaInputMonto('');
+      Alert.alert('¡Prima Inyectada!', `Se sumaron ${formatCOP(monto)} al fondo de pagos anuales.`);
+      fetchDashboard();
+    } catch (e: any) {
+      setSubmittingPrima(false);
+      Alert.alert('Error', e.message || 'No se pudo registrar la prima.');
+    }
+  };
+
+  const handleTogglePagoAnual = (pago: PagoAnualItem) => {
+    const esPagado = pago.estado.toLowerCase() === 'pagado';
+    const nuevoEstado = esPagado ? 'Pendiente' : 'Pagado';
+    Alert.alert(
+      `${pago.concepto}`,
+      `¿Deseas marcar este compromiso de ${formatCOP(pago.costoEstimado)} (${pago.mesPago}) como "${nuevoEstado}" en Google Sheets?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: `Marcar como ${nuevoEstado}`,
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await MivotryAPI.actualizarEstadoPagoAnual({
+                fila: pago.fila,
+                estado: nuevoEstado as 'Pagado' | 'Pendiente'
+              });
+              Alert.alert('¡Actualizado!', `${pago.concepto} ahora está marcado como ${nuevoEstado}.`);
+              fetchDashboard();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'No se pudo actualizar.');
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const fetchDashboard = async () => {
     try {
@@ -249,6 +307,13 @@ export default function App() {
   const pagosAnualesVal = bolsillosData?.items 
     ? (bolsillosData.pagosAnuales ?? 1000000) 
     : (bolsillosData?.pagosAnuales === 6800000 ? 1000000 : (bolsillosData?.pagosAnuales ?? 1000000));
+
+  // Pagos Anuales & Primas Semestrales (Columnas K a O, filas 25 a 29)
+  const pagosAnualesList = dashboardData?.pagosAnuales || [];
+  const totalCostoAnual = pagosAnualesList.reduce((acc, p) => acc + (p.costoEstimado || 0), 0) || 3121250;
+  const totalAhorradoAnual = (pagosAnualesList.reduce((acc, p) => acc + (p.ahorrado || 0), 0) || 1700000) + pagosAnualesVal;
+  const pctCubiertoAnual = totalCostoAnual > 0 ? Math.min(100, Math.round((totalAhorradoAnual / totalCostoAnual) * 100)) : 0;
+  const proximoPagoPendiente = pagosAnualesList.find(p => p.estado.toLowerCase() !== 'pagado');
 
   return (
     <SafeAreaProvider>
@@ -464,6 +529,40 @@ export default function App() {
                 <Text style={styles.metricSub}>Vacaciones / Extras</Text>
               </View>
             </View>
+
+            {/* WIDGET / ACCESO RÁPIDO: PRÓXIMO PAGO ANUAL & COBERTURA */}
+            <TouchableOpacity
+              style={styles.annualShortcutCard}
+              activeOpacity={0.85}
+              onPress={() => setActiveTab('bolsillos')}
+            >
+              <View style={styles.annualShortcutLeft}>
+                <View style={styles.annualShortcutIconBox}>
+                  <Calendar size={18} color={CONFIG.COLORS.accentGold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 4 }}>
+                    <Text style={styles.annualShortcutTitle}>
+                      {proximoPagoPendiente ? 'Próximo Compromiso Anual' : 'Obligaciones Anuales'}
+                    </Text>
+                    <View style={proximoPagoPendiente ? styles.annualBadgePendingSmall : styles.annualBadgePaidSmall}>
+                      <Text style={proximoPagoPendiente ? styles.annualBadgeTextPendingSmall : styles.annualBadgeTextPaidSmall}>
+                        {proximoPagoPendiente ? proximoPagoPendiente.mesPago : 'Al día 🎉'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.annualShortcutConcept}>
+                    {proximoPagoPendiente 
+                      ? `${proximoPagoPendiente.concepto} • ${formatCOP(proximoPagoPendiente.costoEstimado)}` 
+                      : 'Todas las obligaciones pagadas'}
+                  </Text>
+                  <Text style={styles.annualShortcutMeta}>
+                    Fondo I:29: {formatCOP(pagosAnualesVal)} ({pctCubiertoAnual}% cubierto)
+                  </Text>
+                </View>
+              </View>
+              <ArrowRight size={15} color="#94A3B8" />
+            </TouchableOpacity>
 
             {/* TARJETA DE DEUDAS */}
             <View style={styles.card}>
@@ -742,6 +841,114 @@ export default function App() {
               </View>
             </View>
 
+            {/* SECCIÓN PAGOS ANUALES & PRIMAS SEMESTRALES */}
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Pagos Anuales & Primas</Text>
+                <Text style={styles.sectionSubtitle}>Fondeo con primas de Junio y Diciembre (I:29)</Text>
+              </View>
+              <ShieldCheck size={18} color={CONFIG.COLORS.accentMint} />
+            </View>
+
+            {/* FONDO DE PRIMAS CARD */}
+            <View style={styles.primaFondoCard}>
+              <View style={styles.primaFondoTop}>
+                <View>
+                  <Text style={styles.primaFondoLabel}>Fondo Primas Semestrales (I:29)</Text>
+                  <Text style={styles.primaFondoAmount}>{formatCOP(pagosAnualesVal)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.injectPrimaBtn}
+                  activeOpacity={0.8}
+                  onPress={() => setPrimaModalVisible(true)}
+                >
+                  <Plus size={14} color="#06181D" />
+                  <Text style={styles.injectPrimaBtnText}>Inyectar Prima</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.primaProgressSection}>
+                <View style={styles.primaProgressHeader}>
+                  <Text style={styles.primaProgressLabel}>Cobertura Anual Total</Text>
+                  <Text style={styles.primaProgressValue}>{pctCubiertoAnual}% ({formatCOP(totalAhorradoAnual)} / {formatCOP(totalCostoAnual)})</Text>
+                </View>
+                <View style={styles.progressBarTrack}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${Math.min(100, pctCubiertoAnual)}%`,
+                        backgroundColor: pctCubiertoAnual >= 80 ? CONFIG.COLORS.accentMint : CONFIG.COLORS.accentGold
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* LISTA INTERACTIVA DE COMPROMISOS ANUALES */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View>
+                  <Text style={styles.cardTitle}>Obligaciones del Año (K25:O29)</Text>
+                  <Text style={styles.cardDesc}>Toca cualquier pago para cambiar a Pagado / Pendiente</Text>
+                </View>
+                <Calendar size={18} color={CONFIG.COLORS.textMuted} />
+              </View>
+
+              <View style={styles.debtDivider} />
+
+              {pagosAnualesList.length > 0 ? (
+                pagosAnualesList.map((pago, idx) => {
+                  const isPaid = pago.estado.toLowerCase() === 'pagado';
+                  return (
+                    <React.Fragment key={idx}>
+                      <TouchableOpacity
+                        style={styles.annualRowInteractive}
+                        activeOpacity={0.7}
+                        onPress={() => handleTogglePagoAnual(pago)}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.debtName, isPaid && styles.annualItemPaid]}>
+                              {pago.concepto}
+                            </Text>
+                            <View style={isPaid ? styles.statusBadgePaidSmall : styles.statusBadgePendingSmall}>
+                              <Text style={isPaid ? styles.statusBadgeTextPaidSmall : styles.statusBadgeTextPendingSmall}>
+                                {pago.mesPago}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.debtMeta}>
+                            Estimado: {formatCOP(pago.costoEstimado)}
+                            {pago.ahorrado > 0 ? ` • Ahorro asignado: ${formatCOP(pago.ahorrado)}` : ''}
+                          </Text>
+                        </View>
+                        <View style={[styles.annualToggleBadge, isPaid ? styles.annualBadgePaid : styles.annualBadgePending]}>
+                          {isPaid ? (
+                            <>
+                              <CheckCircle2 size={13} color="#10B981" />
+                              <Text style={styles.annualBadgeTextPaid}>Pagado</Text>
+                            </>
+                          ) : (
+                            <>
+                              <Clock size={13} color="#F59E0B" />
+                              <Text style={styles.annualBadgeTextPending}>Pendiente</Text>
+                            </>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                      {idx < pagosAnualesList.length - 1 && <View style={styles.debtDivider} />}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={styles.debtMeta}>Cargando compromisos anuales desde Google Sheets...</Text>
+                </View>
+              )}
+            </View>
+
             {/* NOTA INFORMATIVA */}
             <View style={styles.infoNoteCard}>
               <Text style={styles.infoNoteTitle}>💡 Rendimientos Diarios</Text>
@@ -970,6 +1177,86 @@ export default function App() {
         dashboardData={dashboardData}
         onGastoRegistrado={fetchDashboard}
       />
+
+      {/* MODAL BOTTOM SHEET: INYECTAR PRIMA SEMESTRAL */}
+      <Modal
+        visible={primaModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPrimaModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalCategoryTitle}>Inyectar Prima Semestral</Text>
+                <Text style={styles.modalCategorySub}>
+                  Fondo de Pagos Anuales (Celda I:29)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setPrimaModalVisible(false)}
+              >
+                <X size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.primaExplainText}>
+              Suma dinero al fondo de pagos anuales para cubrir SOAT, Predial, Impuestos y Tecnicomecánica sin desajustar tus quincenas habituales.
+            </Text>
+
+            {/* BALANCE ACTUAL */}
+            <View style={styles.modalBalanceBox}>
+              <Text style={styles.modalBalanceLabel}>Saldo actual en I:29:</Text>
+              <Text style={styles.modalBalanceValue}>
+                {formatCOP(pagosAnualesVal)}
+              </Text>
+            </View>
+
+            {/* INPUT DE MONTO */}
+            <Text style={styles.inputFieldLabel}>Monto de la prima a inyectar ($ COP):</Text>
+            <TextInput
+              style={styles.modalInputMonto}
+              placeholder="$0"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+              value={primaInputMonto}
+              onChangeText={setPrimaInputMonto}
+              autoFocus={true}
+            />
+
+            {/* BOTONES PRESET DE MONTO */}
+            <View style={styles.chipPresetRow}>
+              {[500000, 1000000, 1500000, 2000000].map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={styles.chipPreset}
+                  onPress={() => setPrimaInputMonto(String(val))}
+                >
+                  <Text style={styles.chipPresetText}>+{formatCOP(val)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* BOTÓN CONFIRMAR */}
+            <TouchableOpacity
+              style={[
+                styles.modalSubmitBtn,
+                (!primaInputMonto.trim() || submittingPrima) && styles.modalSubmitBtnDisabled
+              ]}
+              disabled={!primaInputMonto.trim() || submittingPrima}
+              onPress={handleInyectarPrima}
+            >
+              {submittingPrima ? (
+                <ActivityIndicator size="small" color="#06181D" />
+              ) : (
+                <Text style={styles.modalSubmitBtnText}>Sumar a Fila I:29 en Google Sheets</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -1815,6 +2102,216 @@ const styles = StyleSheet.create({
   smsShortcutBadgeText: {
     color: '#10B981',
     fontSize: 11,
+    fontWeight: '700'
+  },
+  annualShortcutCard: {
+    backgroundColor: '#0F3741',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.25)'
+  },
+  annualShortcutLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1
+  },
+  annualShortcutIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  annualShortcutTitle: {
+    color: '#F1F5F9',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  annualShortcutConcept: {
+    color: CONFIG.COLORS.accentGold,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  annualShortcutMeta: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2
+  },
+  annualBadgePendingSmall: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)'
+  },
+  annualBadgeTextPendingSmall: {
+    color: '#F59E0B',
+    fontSize: 10,
+    fontWeight: '700'
+  },
+  annualBadgePaidSmall: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  annualBadgeTextPaidSmall: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '700'
+  },
+  primaFondoCard: {
+    backgroundColor: '#0F3741',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  primaFondoTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14
+  },
+  primaFondoLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  primaFondoAmount: {
+    color: '#34D399',
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  injectPrimaBtn: {
+    backgroundColor: CONFIG.COLORS.accentMint,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10
+  },
+  injectPrimaBtnText: {
+    color: '#06181D',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  primaProgressSection: {
+    marginTop: 4
+  },
+  primaProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  primaProgressLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  primaProgressValue: {
+    color: '#F1F5F9',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  annualRowInteractive: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12
+  },
+  annualItemPaid: {
+    textDecorationLine: 'none'
+  },
+  annualToggleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  annualBadgePaid: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  annualBadgeTextPaid: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  annualBadgePending: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.3)'
+  },
+  annualBadgeTextPending: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  statusBadgePaidSmall: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
+  },
+  statusBadgeTextPaidSmall: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '600'
+  },
+  statusBadgePendingSmall: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
+  },
+  statusBadgeTextPendingSmall: {
+    color: '#F59E0B',
+    fontSize: 10,
+    fontWeight: '600'
+  },
+  primaExplainText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16
+  },
+  chipPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18
+  },
+  chipPreset: {
+    backgroundColor: '#0A252C',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)'
+  },
+  chipPresetText: {
+    color: CONFIG.COLORS.accentMint,
+    fontSize: 12,
     fontWeight: '700'
   }
 });

@@ -138,5 +138,36 @@ export const MivotryAPI = {
       body: JSON.stringify({ action: 'actualizarFondoOcasional', monto })
     });
     return await res.json();
+  },
+
+  /**
+   * Inyecta o actualiza el ahorro para pagos anuales fondeado con primas (I29)
+   */
+  async actualizarAhorroPagosAnuales(params: { monto: number; modo?: 'sumar' | 'reemplazar'; concepto?: string }) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'actualizarAhorroPagosAnuales',
+        monto: params.monto,
+        modo: params.modo || 'sumar',
+        concepto: params.concepto || 'Inyección desde Prima semestral'
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Actualiza el estado de un pago anual (ej. "Pagado" o "Pendiente" en columna O)
+   */
+  async actualizarEstadoPagoAnual(params: { fila: number; estado: 'Pagado' | 'Pendiente' }) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'actualizarEstadoPagoAnual',
+        fila: params.fila,
+        estado: params.estado
+      })
+    });
+    return await res.json();
   }
 };
