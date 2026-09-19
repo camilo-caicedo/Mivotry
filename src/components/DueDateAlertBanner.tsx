@@ -5,9 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  LayoutAnimation,
-  Platform,
-  UIManager
+  LayoutAnimation
 } from 'react-native';
 import {
   AlertTriangle,
@@ -26,11 +24,6 @@ import {
   getDueDatesSummary,
   formatBadgeCountdown
 } from '../services/dueDatesService';
-
-// Habilitar animaciones de layout en Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface DueDateAlertBannerProps {
   dashboardData: DashboardResponse | null;
