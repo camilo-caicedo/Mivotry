@@ -105,6 +105,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           {displayedActions.map((action) => {
@@ -174,14 +175,18 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginBottom: 16,
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    paddingHorizontal: 0,
+    marginBottom: 12,
+  },
+  scrollContainer: {
+    marginHorizontal: -16,
   },
   headerTitleRow: {
     flexDirection: 'row',
