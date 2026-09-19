@@ -63,26 +63,26 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
   const [processing, setProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const inputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Monitor keyboard to adjust input bar clearance above FloatingTabBar
+  // Monitor keyboard height to push input bar above keyboard on Android
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, () => {
-      setIsKeyboardVisible(true);
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
     });
 
     return () => {
@@ -451,8 +451,8 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}
-      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      style={[styles.container, Platform.OS === 'android' && keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}
     >
       <FlatList
         ref={flatListRef}
@@ -579,7 +579,7 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       </View>
 
       {/* INPUT INFERIOR DE MENSAJES */}
-      <View style={[styles.inputBar, !isKeyboardVisible && styles.inputBarWithTab]}>
+      <View style={[styles.inputBar, keyboardHeight === 0 && styles.inputBarWithTab]}>
         <TextInput
           ref={inputRef}
           style={styles.input}

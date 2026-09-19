@@ -164,11 +164,9 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setIsKeyboardVisible(false);
       Animated.parallel([
-        Animated.spring(translateY, {
+        Animated.timing(translateY, {
           toValue: 0,
-          damping: theme.motion.spring.snappy.damping,
-          stiffness: theme.motion.spring.snappy.stiffness,
-          mass: theme.motion.spring.snappy.mass,
+          duration: 220,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
