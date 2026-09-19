@@ -414,14 +414,12 @@ export default function App() {
             onPress={() => setInboxModalVisible(true)}
           >
             <Inbox size={19} color={CONFIG.COLORS.textLight} />
-            {(dashboardData?.totalNotificacionesPendientes || 0) > 0 ? (
+            {(dashboardData?.totalNotificacionesPendientes || 0) > 0 && (
               <View style={styles.badgeNotificationCount}>
                 <Text style={styles.badgeNotificationText}>
                   {dashboardData?.totalNotificacionesPendientes}
                 </Text>
               </View>
-            ) : (
-              <View style={styles.badgeNotification} />
             )}
           </TouchableOpacity>
         </View>
