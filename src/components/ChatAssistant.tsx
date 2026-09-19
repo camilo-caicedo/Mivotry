@@ -40,12 +40,12 @@ interface Props {
 }
 
 const QUICK_PROMPTS = [
-  '⛽ Gasolina 50k',
-  '🍽️ Almuerzo 25k',
-  '🛒 Pricesmart 100k',
-  '🥬 D1 30k',
-  '🍿 Cine 40k',
-  '🐱 Gatos 50k'
+  { label: '⛽ Gasolina 50k', template: 'Gasolina 50k' },
+  { label: '🍽️ Almuerzo 25k', template: 'Almuerzo 25k' },
+  { label: '🛒 Pricesmart 100k', template: 'Pricesmart 100k de bonos' },
+  { label: '🥬 D1 30k', template: 'D1 30k de bonos' },
+  { label: '🍿 Cine 40k', template: 'Salidas 40k' },
+  { label: '🐱 Gatos 50k', template: 'Gatos 50k de bonos' }
 ];
 
 export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegistered }) => {
@@ -359,9 +359,11 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
     }
   };
 
-  const handleQuickPrompt = (promptText: string) => {
-    if (processing) return;
-    handleSend(promptText);
+  const handleQuickPrompt = (template: string) => {
+    setInputText(template);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 60);
   };
 
   const handleConfirmAction = async (msgId: string, actionCard: NonNullable<Message['actionCard']>) => {
@@ -539,11 +541,11 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
             <TouchableOpacity
               key={idx}
               style={styles.quickChip}
-              onPress={() => handleQuickPrompt(chip)}
+              onPress={() => handleQuickPrompt(chip.template)}
               activeOpacity={0.7}
               disabled={processing}
             >
-              <Text style={styles.quickChipText}>{chip}</Text>
+              <Text style={styles.quickChipText}>{chip.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
