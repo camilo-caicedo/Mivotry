@@ -157,20 +157,18 @@ function getDashboardData() {
   const fondoOcasional = cleanNumber(sheet.getRange("F20").getValue());
   const totalManejoCalculadoSheet = cleanNumber(sheet.getRange("F21").getValue()); // $585,000
   
-  // D. Tarjeta de Bonos (Filas 23 a 27, Columnas A a C)
-  let bonosPresupuestoTotal = cleanNumber(sheet.getRange("B22").getValue()); // $1,600,000
-  if (bonosPresupuestoTotal <= 0) {
-    bonosPresupuestoTotal = cleanNumber(sheet.getRange("B23").getValue()) || 1600000;
-  }
-  const rowsBonos = sheet.getRange("A23:C27").getValues();
+  // D. Tarjeta de Bonos (Filas 24 a 28 para rubros individuales, Fila 23 es el encabezado total)
+  let bonosPresupuestoTotal = cleanNumber(sheet.getRange("B23").getValue()) || 1600000;
+  const rowsBonos = sheet.getRange("A24:C28").getValues();
   const gastosBonos = [];
   
   for (let i = 0; i < rowsBonos.length; i++) {
     const row = rowsBonos[i];
     const nombre = String(row[0] || "").trim();
     if (!nombre) continue;
+    if (nombre.toLowerCase() === "bonos" || nombre.toLowerCase() === "total") continue;
     
-    const rowNumber = 23 + i;
+    const rowNumber = 24 + i;
     const total = cleanNumber(row[1]);
     const manejo = cleanNumber(row[2]);
     
@@ -377,10 +375,10 @@ function registrarGasto(payload) {
       }
     }
   } else if (cuenta === "bonos") {
-    const values = sheet.getRange("A23:A27").getValues();
+    const values = sheet.getRange("A24:A28").getValues();
     for (let i = 0; i < values.length; i++) {
       if (String(values[i][0]).trim().toLowerCase() === categoria.toLowerCase()) {
-        targetRow = 23 + i;
+        targetRow = 24 + i;
         targetCol = 3; // Columna C (Manejo de bonos)
         break;
       }
@@ -482,19 +480,20 @@ function cargarQuincena(payload) {
 function recargarBonos(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
-  const rows = sheet.getRange("A23:C27").getValues();
+  const rows = sheet.getRange("A24:C28").getValues();
   
   const actualizados = [];
   
   for (let i = 0; i < rows.length; i++) {
     const nombre = String(rows[i][0] || "").trim();
     if (!nombre) continue;
+    if (nombre.toLowerCase() === "bonos" || nombre.toLowerCase() === "total") continue;
     
-    const rowNum = 23 + i;
+    const rowNum = 24 + i;
     const presupuestoBase = cleanNumber(rows[i][1]); // Columna B
     const manejoActual = cleanNumber(rows[i][2]);    // Columna C actual
     
-    // Regla de acumulación: lo que quedó + nuevo presupuesto
+    // Regla de acumulación: lo que quedó + nuevo presupuesto (o se asigna el presupuesto base)
     const nuevoManejo = (manejoActual > 0 ? manejoActual : 0) + presupuestoBase;
     sheet.getRange(rowNum, 3).setValue(nuevoManejo);
     
@@ -505,6 +504,11 @@ function recargarBonos(payload) {
       nuevoTotalManejo: nuevoManejo
     });
   }
+  
+  // Establecer fórmula en celda C23 para que sume dinámicamente los rubros individuales sin duplicar
+  try {
+    sheet.getRange(23, 3).setFormula("=SUM(C24:C28)");
+  } catch (e) {}
   
   logTransaction(ss, {
     cuenta: "bonos",
@@ -649,17 +653,17 @@ function findRubroCell(sheet, cuenta, categoria) {
       }
     }
   } else if (c.includes("bono")) {
-    const values = sheet.getRange("A23:A27").getValues();
+    const values = sheet.getRange("A24:A28").getValues();
     for (let i = 0; i < values.length; i++) {
       const val = String(values[i][0] || "").trim();
       if (val && val.toLowerCase() === catLower) {
-        return { row: 23 + i, col: 3, nombre: val };
+        return { row: 24 + i, col: 3, nombre: val };
       }
     }
     for (let i = 0; i < values.length; i++) {
       const val = String(values[i][0] || "").trim();
       if (val && (val.toLowerCase().includes(catLower) || catLower.includes(val.toLowerCase()))) {
-        return { row: 23 + i, col: 3, nombre: val };
+        return { row: 24 + i, col: 3, nombre: val };
       }
     }
   } else if (c.includes("bolsillo")) {

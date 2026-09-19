@@ -33,10 +33,15 @@ export const BonosCompactCard: React.FC<BonosCompactCardProps> = ({
   onPress,
   style,
 }) => {
-  const categories: GastoItem[] =
+  const rawCategories: GastoItem[] =
     bonosData?.gastos && bonosData.gastos.length > 0
       ? bonosData.gastos
       : DEFAULT_BONOS_CATEGORIES;
+
+  // Filtrar el encabezado 'Bonos' (fila 23) para sumar y mostrar únicamente las subcategorías reales
+  const categories: GastoItem[] = rawCategories.filter(
+    item => (item.nombre || '').trim().toLowerCase() !== 'bonos' && item.fila !== 23
+  );
 
   const presupuestoTotal =
     bonosData?.presupuestoTotal && bonosData.presupuestoTotal > 0
