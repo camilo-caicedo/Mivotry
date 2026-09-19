@@ -130,6 +130,13 @@ export const MivotryAPI = {
   },
 
   /**
+   * Obtiene todos los datos en vivo del Google Sheet (alias getDashboardData)
+   */
+  async getDashboardData(): Promise<DashboardResponse> {
+    return this.getDashboard();
+  },
+
+  /**
    * Registra un gasto en Manejo (Nómina o Bonos)
    */
   async registrarGasto(params: {
@@ -149,10 +156,12 @@ export const MivotryAPI = {
   /**
    * Carga la quincena 15 o 30 (Rollover acumulativo)
    */
-  async cargarQuincena(quincena: 15 | 30) {
+  async cargarQuincena(params: 15 | 30 | { quincena: 15 | 30; sobrescribir?: boolean }) {
+    const quincena = typeof params === 'number' ? params : params.quincena;
+    const sobrescribir = typeof params === 'object' ? params.sobrescribir : false;
     const res = await fetch(CONFIG.API_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'cargarQuincena', quincena })
+      body: JSON.stringify({ action: 'cargarQuincena', quincena, sobrescribir })
     });
     return await res.json();
   },
