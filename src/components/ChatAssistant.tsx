@@ -110,13 +110,18 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       // REGISTRO DE GASTO (LENGUAJE NATURAL)
       // Extraer monto
       let monto = 0;
-      const kMatch = text.match(/(\d+)\s*(?:k|mil)/i);
-      const standardMatch = text.match(/\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})*|[0-9]+)/);
+      // 1. Casos con k o mil (ej: 45k, 50 mil, 12.5k, 12,5 mil)
+      const kMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:k|mil(?:es)?)\b/i);
 
       if (kMatch && kMatch[1]) {
-        monto = parseInt(kMatch[1], 10) * 1000;
-      } else if (standardMatch && standardMatch[1]) {
-        monto = parseFloat(standardMatch[1].replace(/[^0-9]/g, ''));
+        const base = parseFloat(kMatch[1].replace(',', '.'));
+        monto = Math.round(base * 1000);
+      } else {
+        // 2. Montos formateados con separadores (ej: 716.200, 3´200.000, 716,200) o enteros directos (ej: 716200)
+        const standardMatch = text.match(/(?:\$|COP)?\s*\b([0-9]{1,3}(?:['´.,][0-9]{3})+|[0-9]+)\b/i);
+        if (standardMatch && standardMatch[1]) {
+          monto = parseInt(standardMatch[1].replace(/[^0-9]/g, ''), 10);
+        }
       }
 
       if (monto > 0) {
@@ -124,24 +129,29 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
         let categoria = 'Salidas';
 
         // Detectar bonos vs nómina
-        if (lower.includes('bono') || lower.includes('peoplepass') || lower.includes('paycash')) {
+        if (lower.includes('bono') || lower.includes('peoplepass') || lower.includes('paycash') || lower.includes('sodexo') || lower.includes('pluxee')) {
           cuenta = 'bonos';
         }
 
         // Detectar categoría
-        if (lower.includes('gasolina') || lower.includes('lavar') || lower.includes('tanquear') || lower.includes('terpel') || lower.includes('texaco')) {
+        if (lower.includes('gasolina') || lower.includes('lavar') || lower.includes('tanquear') || lower.includes('terpel') || lower.includes('texaco') || lower.includes('primax')) {
           categoria = 'Gasolina/Lavar';
-        } else if (lower.includes('pricesmart')) {
+        } else if (lower.includes('pricesmart') || lower.includes('price smart')) {
           categoria = 'Pricesmart';
           cuenta = 'bonos';
-        } else if (lower.includes('verdura') || lower.includes('mercado') || lower.includes('super') || lower.includes('d1') || lower.includes('exito')) {
+        } else if (lower.includes('verdura') || lower.includes('mercado') || lower.includes('super') || lower.includes('d1') || lower.includes('exito') || lower.includes('olimpica') || lower.includes('jumbo') || lower.includes('carulla')) {
           categoria = 'Verduras y demas';
           cuenta = 'bonos';
-        } else if (lower.includes('gato') || lower.includes('veterin') || lower.includes('comida gato')) {
+        } else if (lower.includes('gato') || lower.includes('veterin') || lower.includes('comida gato') || lower.includes('michis')) {
           categoria = 'Gatos';
           cuenta = 'bonos';
-        } else if (lower.includes('salida') || lower.includes('cine') || lower.includes('restaurante') || lower.includes('bar') || lower.includes('almuerzo')) {
-          categoria = cuenta === 'bonos' ? 'Salidas 1' : 'Salidas';
+        } else if (lower.includes('salida') || lower.includes('cine') || lower.includes('restaurante') || lower.includes('bar') || lower.includes('almuerzo') || lower.includes('comida') || lower.includes('cafe')) {
+          if (cuenta === 'bonos') {
+            const hasSalidas1 = dashboardData?.bonos?.gastos?.some(g => g.nombre.toLowerCase().includes('salidas 1'));
+            categoria = hasSalidas1 ? 'Salidas 1' : 'Salidas';
+          } else {
+            categoria = 'Salidas';
+          }
         } else if (lower.includes('rappi')) {
           categoria = 'Rappi';
         }
