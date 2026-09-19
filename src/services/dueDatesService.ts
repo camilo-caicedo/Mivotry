@@ -1,4 +1,5 @@
 import { DashboardResponse, TarjetaCreditoItem, PagoAnualItem } from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface DueDateAlertItem {
   id: string;
@@ -372,4 +373,58 @@ export function formatBadgeCountdown(item: DueDateAlertItem): string {
     }
     return `${item.title} pendiente`;
   }
+}
+
+export const SNOOZE_ALERTS_KEY = '@mivotry_snooze_alerts_until';
+
+/**
+ * Posponer la visualización de alertas urgentes por N días
+ */
+export async function snoozeAlerts(days: number): Promise<number> {
+  const snoozeUntil = Date.now() + days * 24 * 60 * 60 * 1000;
+  await AsyncStorage.setItem(SNOOZE_ALERTS_KEY, snoozeUntil.toString());
+  return snoozeUntil;
+}
+
+/**
+ * Obtener timestamp hasta el cual están silenciadas las alertas.
+ * Si ya venció el tiempo, lo limpia y retorna null.
+ */
+export async function getSnoozedUntil(): Promise<number | null> {
+  try {
+    const val = await AsyncStorage.getItem(SNOOZE_ALERTS_KEY);
+    if (!val) return null;
+    const ts = parseInt(val, 10);
+    if (isNaN(ts)) return null;
+    if (Date.now() >= ts) {
+      await AsyncStorage.removeItem(SNOOZE_ALERTS_KEY);
+      return null;
+    }
+    return ts;
+  } catch (err) {
+    console.error('[DueDatesService] Error reading snooze:', err);
+    return null;
+  }
+}
+
+/**
+ * Reactivar alertas inmediatamente
+ */
+export async function clearSnoozedAlerts(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(SNOOZE_ALERTS_KEY);
+  } catch (err) {
+    console.error('[DueDatesService] Error clearing snooze:', err);
+  }
+}
+
+/**
+ * Formatear fecha legible para el aviso de pospuesto
+ */
+export function formatSnoozeDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const dia = date.getDate();
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const mes = meses[date.getMonth()];
+  return `${dia} de ${mes}`;
 }
