@@ -31,7 +31,7 @@ import {
 import { CONFIG } from '../config';
 import { cacheService } from '../services/cacheService';
 import { DashboardResponse } from '../services/api';
-import { NotificationService } from '../services/notificationService';
+
 import { theme } from '../theme';
 
 export interface AdminScreenProps {
@@ -126,34 +126,14 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
     onRefresh();
   };
 
-  const handleScheduleReminders = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    if (!dashboardData) {
-      Alert.alert('Aviso', 'Sincroniza el dashboard primero para programar los recordatorios.');
-      return;
-    }
-    try {
-      const count = await NotificationService.syncScheduledReminders(dashboardData);
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-      Alert.alert(
-        'Alertas Programadas',
-        `Se han programado ${count} recordatorios de cortes y quincenas en tu dispositivo.`
-      );
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'No se pudieron programar las alertas.');
-    }
+  const handleScheduleReminders = () => {
+    Alert.alert('No disponible', 'Las notificaciones fueron removidas de esta versión.');
   };
 
-  const handleSendTestNotification = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await NotificationService.sendTestNotification();
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-      Alert.alert('¡Notificación enviada!', 'Revisa la barra de notificaciones de tu dispositivo.');
-    } catch (err: any) {
-      Alert.alert('Permiso Requerido', err.message || 'Por favor habilita los permisos de notificación.');
-    }
+  const handleSendTestNotification = () => {
+    Alert.alert('No disponible', 'Las notificaciones fueron removidas de esta versión.');
   };
+
 
   const maskedApiUrl = useMemo(() => {
     try {

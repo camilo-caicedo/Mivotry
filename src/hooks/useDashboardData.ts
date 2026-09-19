@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Alert } from 'react-native';
 import { DashboardResponse, MivotryAPI } from '../services/api';
 import { cacheService } from '../services/cacheService';
-import { NotificationService } from '../services/notificationService';
 
 export interface UseDashboardDataOptions {
   initialQuincena?: 15 | 30;
@@ -80,11 +79,14 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
           setLoading(true);
         }
 
-        const data = await MivotryAPI.getDashboardData();
+        // Timeout de seguridad: si la API no responde en 15s, liberar la pantalla
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout: Google Sheets tardó demasiado')), 15000)
+        );
+
+        const data = await Promise.race([MivotryAPI.getDashboardData(), timeoutPromise]);
         setDashboardData(data);
         await cacheService.saveCachedDashboard(data);
-        // Sincronizar recordatorios de corte y quincena automáticamente
-        NotificationService.syncScheduledReminders(data).catch(() => {});
       } catch (err: any) {
         console.error('[useDashboardData] Error al conectar con Google Sheets:', err);
         if (!dashboardDataRef.current) {

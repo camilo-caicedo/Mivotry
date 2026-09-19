@@ -93,6 +93,9 @@ function doPost(e) {
       case "actualizarSaldoTarjetaCredito":
         return createJsonResponse(actualizarSaldoTarjetaCredito(contents));
         
+      case "pagarCuotaCredito":
+        return createJsonResponse(pagarCuotaCredito(contents));
+        
       case "aprobarLoteNotificaciones":
         return createJsonResponse(aprobarLoteNotificaciones(contents));
         
@@ -925,6 +928,57 @@ function actualizarSaldoTarjetaCredito(payload) {
     saldoAnterior: saldoActual,
     nuevoSaldo: nuevoSaldo,
     operacion: operacion
+  };
+}
+
+/**
+ * =========================================================================
+ * 6D. PAGAR CUOTA DE CRÉDITO BANCARIO (Apto I4 / Occidente I5)
+ * =========================================================================
+ * payload: { credito: 'apto' | 'occidente', monto: number, concepto?: string }
+ */
+function pagarCuotaCredito(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+
+  const credito = String(payload.credito || "").trim().toLowerCase();
+  const monto = cleanNumber(payload.monto);
+  const concepto = String(payload.concepto || ("Pago cuota " + credito)).trim();
+
+  if (monto <= 0) return { success: false, error: "El monto debe ser mayor a cero" };
+
+  let targetCell = null;
+  let nombre = "";
+
+  if (credito.includes("apto")) {
+    targetCell = sheet.getRange("I4");
+    nombre = "Crédito Apto";
+  } else if (credito.includes("occidente") || credito.includes("occ")) {
+    targetCell = sheet.getRange("I5");
+    nombre = "Crédito Occidente";
+  } else {
+    return { success: false, error: "Crédito no reconocido. Usa 'apto' u 'occidente'." };
+  }
+
+  const saldoActual = cleanNumber(targetCell.getValue());
+  const nuevoSaldo = Math.max(0, saldoActual - monto);
+  targetCell.setValue(nuevoSaldo);
+
+  logTransaction(ss, {
+    cuenta: "credito_bancario",
+    categoria: nombre,
+    concepto: concepto + " (-$" + monto + ")",
+    monto: monto,
+    saldoRestante: nuevoSaldo,
+    origen: payload.origen || "manual"
+  });
+
+  return {
+    success: true,
+    credito: nombre,
+    saldoAnterior: saldoActual,
+    nuevoSaldo: nuevoSaldo,
+    montoPagado: monto
   };
 }
 

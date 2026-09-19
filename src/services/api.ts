@@ -335,6 +335,25 @@ export const MivotryAPI = {
   },
 
   /**
+   * Registra el pago de una cuota de crédito bancario (Apto o Crédito Occidente)
+   * operacion: 'restar' reduce el saldo de deuda
+   */
+  async pagarCuotaCredito(params: {
+    credito: 'apto' | 'occidente';
+    monto: number;
+    concepto?: string;
+  }) {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'pagarCuotaCredito',
+        ...params
+      })
+    });
+    return await res.json();
+  },
+
+  /**
    * Obtiene el historial reciente de transacciones registradas en Transacciones_Log
    */
   async getHistorialLogs(limit?: number): Promise<{ success: boolean; total: number; logs: LogItem[] }> {

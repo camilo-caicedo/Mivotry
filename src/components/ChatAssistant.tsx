@@ -26,11 +26,13 @@ interface Message {
   text: string;
   time: string;
   actionCard?: {
-    type: 'confirm_expense';
+    type: 'confirm_expense' | 'confirm_credit_card';
     cuenta: 'nomina' | 'bonos';
     categoria: string;
     monto: number;
     concepto: string;
+    tarjeta?: string;       // nombre de la tarjeta de crédito (solo para confirm_credit_card)
+    tarjetaFila?: number;   // fila en el Sheet (solo para confirm_credit_card)
     confirmed?: boolean;
     cancelled?: boolean;
   };
@@ -55,7 +57,7 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
     {
       id: '1',
       sender: 'assistant',
-      text: '¡Hola! 🐾 Soy tu asistente Mivotry. Puedes decirme cosas como:\n• "Gasté 45.000 en gasolina"\n• "Compré 120k en PriceSmart con bonos"\n• "Mauro me abonó 50 mil"\n• "¿Cuánto me queda en salidas?"',
+      text: '¡Hola! 🐾 Soy tu asistente Mivotry. Puedes decirme cosas como:\n• "Gasté 45.000 en gasolina"\n• "Compré 120k en PriceSmart con bonos"\n• "Mauro me abonó 50 mil"\n• "Gasto tarjeta crédito Infinity 18000"\n• "¿Cuánto me queda en salidas?"',
       time: 'Ahora'
     }
   ]);
@@ -311,7 +313,59 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       }
 
       if (monto > 0) {
+        // ── TARJETA DE CRÉDITO ─────────────────────────────────────
+        // Detectar si el mensaje menciona una tarjeta de crédito
+        const esTarjetaCredito =
+          lower.includes('tarjeta credito') ||
+          lower.includes('tarjeta de credito') ||
+          lower.includes('tarjeta de crédito') ||
+          lower.includes('tarjeta crédito') ||
+          /\btc\b/.test(lower);
+
+        // Buscar coincidencia con nombres de tarjetas del dashboard
+        const tarjetasDisponibles = dashboardData?.deudas?.tarjetasDetalle ?? [];
+        let tarjetaMatch = tarjetasDisponibles.find(t =>
+          lower.includes(t.nombre.toLowerCase())
+        );
+
+        // Si aún no hay coincidencia pero el mensaje suena a tarjeta de crédito,
+        // tomar la primera tarjeta disponible como fallback (y notificar al usuario)
+        const esTarjeta = esTarjetaCredito || !!tarjetaMatch;
+
+        if (esTarjeta) {
+          const tarjetaNombre = tarjetaMatch?.nombre ?? (tarjetasDisponibles[0]?.nombre ?? 'Sin especificar');
+          const tarjetaFila = tarjetaMatch?.fila ?? tarjetasDisponibles[0]?.fila;
+          const esAmbigua = !tarjetaMatch && tarjetasDisponibles.length > 1;
+
+          const msgConfirm = esAmbigua
+            ? `Entendido. Voy a registrar un consumo de ${formatCOP(monto)} en Tarjeta de Crédito. No identifiqué cuál tarjeta; usaré "${tarjetaNombre}" por defecto. ¿Confirmas?`
+            : `Entendido. Registraré un consumo de ${formatCOP(monto)} en la Tarjeta ${tarjetaNombre}. ¿Confirmas?`;
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              sender: 'assistant',
+              text: msgConfirm,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              actionCard: {
+                type: 'confirm_credit_card',
+                cuenta: 'nomina',   // no aplica para TC, pero se requiere por tipo
+                categoria: 'Tarjeta de Crédito',
+                monto: monto,
+                concepto: text,
+                tarjeta: tarjetaNombre,
+                tarjetaFila: tarjetaFila
+              }
+            }
+          ]);
+          setProcessing(false);
+          return;
+        }
+
+        // ── GASTO NORMAL (NÓMINA / BONOS) ──────────────────────────
         let cuenta: 'nomina' | 'bonos' = 'nomina';
+
         let categoria = 'Salidas';
 
         // Detectar bonos vs nómina
@@ -394,6 +448,42 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
   const handleConfirmAction = async (msgId: string, actionCard: NonNullable<Message['actionCard']>) => {
     try {
       setProcessing(true);
+
+      // ── TARJETA DE CRÉDITO ──────────────────────────────────────
+      if (actionCard.type === 'confirm_credit_card') {
+        const res = await MivotryAPI.actualizarSaldoTarjetaCredito({
+          tarjeta: actionCard.tarjeta ?? '',
+          monto: actionCard.monto,
+          operacion: 'sumar',
+          concepto: actionCard.concepto,
+          fila: actionCard.tarjetaFila
+        });
+
+        if (res.success) {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === msgId && m.actionCard
+                ? { ...m, actionCard: { ...m.actionCard, confirmed: true } }
+                : m
+            )
+          );
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              sender: 'assistant',
+              text: `✅ ¡Listo! Se sumaron ${formatCOP(actionCard.monto)} al saldo de la Tarjeta ${actionCard.tarjeta}. Nuevo saldo: ${formatCOP(res.nuevoSaldo)}.`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]);
+          onExpenseRegistered();
+        } else {
+          Alert.alert('Error', res.error || 'No se pudo registrar el consumo en la tarjeta');
+        }
+        return;
+      }
+
+      // ── GASTO NORMAL (NÓMINA / BONOS) ──────────────────────────
       const res = await MivotryAPI.registrarGasto({
         cuenta: actionCard.cuenta,
         categoria: actionCard.categoria,
@@ -434,6 +524,7 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       setProcessing(false);
     }
   };
+
 
   const handleCancelAction = (msgId: string) => {
     setMessages(prev =>
@@ -487,9 +578,15 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
                         <Text style={styles.confirmValue}>{item.actionCard.categoria}</Text>
                       </Text>
                       <Text style={styles.confirmRow}>
-                        <Text style={styles.confirmLabel}>Cuenta: </Text>
+                        <Text style={styles.confirmLabel}>
+                          {item.actionCard.type === 'confirm_credit_card' ? 'Tarjeta: ' : 'Cuenta: '}
+                        </Text>
                         <Text style={styles.confirmValue}>
-                          {item.actionCard.cuenta === 'bonos' ? 'Tarjeta Bonos' : 'Nómina'}
+                          {item.actionCard.type === 'confirm_credit_card'
+                            ? `💳 ${item.actionCard.tarjeta}`
+                            : item.actionCard.cuenta === 'bonos'
+                            ? 'Tarjeta Bonos'
+                            : 'Nómina'}
                         </Text>
                       </Text>
                     </View>
@@ -516,7 +613,11 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
                 {item.actionCard?.confirmed && (
                   <View style={styles.statusBadgeSuccess}>
                     <CheckCircle2 size={12} color="#10B981" />
-                    <Text style={styles.statusBadgeTextSuccess}>Gasto registrado en Sheets</Text>
+                    <Text style={styles.statusBadgeTextSuccess}>
+                      {item.actionCard.type === 'confirm_credit_card'
+                        ? 'Consumo TC registrado en Sheets'
+                        : 'Gasto registrado en Sheets'}
+                    </Text>
                   </View>
                 )}
 

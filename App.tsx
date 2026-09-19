@@ -46,7 +46,7 @@ import { PrimaInjectionModal } from './src/components/PrimaInjectionModal';
 import { cacheService } from './src/services/cacheService';
 import { GastoItem } from './src/services/api';
 import { QuickActionItem } from './src/services/quickActionsService';
-import { NotificationService } from './src/services/notificationService';
+
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
@@ -76,13 +76,15 @@ export default function App() {
     porcentajeManejo
   } = useDashboardData();
 
-  // Solicitar permisos de notificaciones al arrancar (una sola vez, cuando las fuentes están listas)
+  const [forceShow, setForceShow] = useState(false);
+
+  // Escape de emergencia: si después de 18s la app sigue en loading, forzar entrada
   useEffect(() => {
-    if (fontsLoaded) {
-      NotificationService.requestPermissions().catch(() => {});
-      NotificationService.setupChannels().catch(() => {});
-    }
-  }, [fontsLoaded]);
+    const timer = setTimeout(() => setForceShow(true), 18000);
+    return () => clearTimeout(timer);
+  }, []);
+
+
 
   const {
     smsModalVisible,
@@ -137,7 +139,7 @@ export default function App() {
     await fetchDashboard(true);
   };
 
-  if (!fontsLoaded || (loading && !dashboardData)) {
+  if (!forceShow && (!fontsLoaded || (loading && !dashboardData))) {
     return (
       <SafeAreaProvider>
         <SafeAreaView style={styles.loadingContainer}>
@@ -228,16 +230,15 @@ export default function App() {
           )}
         </View>
 
-        {/* BOTÓN FLOTANTE (FAB) PARA REGISTRAR GASTO */}
+        {/* BOTÓN FLOTANTE (FAB) PARA REGISTRAR MOVIMIENTO */}
         {(activeTab === 'dashboard' || activeTab === 'manejo') && (
           <AnimatedPressable
             style={styles.floatingActionButton}
             scale={0.92}
             onPress={handleOpenFloatingExpense}
-            accessibilityLabel="Registrar nuevo gasto"
+            accessibilityLabel="Registrar nuevo movimiento"
           >
-            <Plus size={20} color="#060D0F" strokeWidth={2.8} />
-            <Text style={styles.floatingActionText}>Gasto</Text>
+            <Plus size={24} color="#060D0F" strokeWidth={2.8} />
           </AnimatedPressable>
         )}
 
@@ -376,23 +377,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 86,
     right: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: theme.colors.accentMint,
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 7,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
     shadowRadius: 10,
     elevation: 10,
     zIndex: 60,
-  },
-  floatingActionText: {
-    fontFamily: theme.fonts.extraBold,
-    color: '#060D0F',
-    fontSize: 14,
   }
 });
