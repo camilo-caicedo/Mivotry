@@ -39,7 +39,8 @@ import {
   ArrowRight,
   ShieldCheck,
   Clock,
-  Inbox
+  Inbox,
+  History
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -48,6 +49,11 @@ import { MivotryAPI, DashboardResponse, GastoItem, PagoAnualItem } from './src/s
 import { ChatAssistant } from './src/components/ChatAssistant';
 import { SMSDetectorModal } from './src/components/SMSDetectorModal';
 import { NotificationsInboxModal } from './src/components/NotificationsInboxModal';
+import { TransactionHistoryModal } from './src/components/TransactionHistoryModal';
+import { DueDateAlertBanner } from './src/components/DueDateAlertBanner';
+import { CategoryProgressCard } from './src/components/CategoryProgressCard';
+import { BudgetProgressBar } from './src/components/BudgetProgressBar';
+import { cacheService } from './src/services/cacheService';
 
 const { width } = Dimensions.get('window');
 
@@ -75,6 +81,7 @@ export default function App() {
   const [primaInputMonto, setPrimaInputMonto] = useState('');
   const [submittingPrima, setSubmittingPrima] = useState(false);
   const [inboxModalVisible, setInboxModalVisible] = useState(false);
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
 
   const handleInyectarPrima = async () => {
     const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
@@ -129,13 +136,17 @@ export default function App() {
     );
   };
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (silent: boolean = false) => {
     try {
+      if (!silent && !dashboardData) setLoading(true);
       const data = await MivotryAPI.getDashboard();
       setDashboardData(data);
+      await cacheService.saveCachedDashboard(data);
     } catch (err: any) {
       console.error(err);
-      Alert.alert('Error de conexión', 'No se pudo conectar con tu Google Sheet. Revisa tu conexión a internet.');
+      if (!dashboardData) {
+        Alert.alert('Error de conexión', 'No se pudo conectar con tu Google Sheet. Revisa tu conexión a internet.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -143,12 +154,24 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchDashboard();
+    const loadCacheAndSync = async () => {
+      try {
+        const cached = await cacheService.getCachedDashboard();
+        if (cached && cached.data) {
+          setDashboardData(cached.data);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('Cache load error:', e);
+      }
+      fetchDashboard(true);
+    };
+    loadCacheAndSync();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchDashboard();
+    fetchDashboard(false);
   };
 
   const formatCOP = (val: number = 0) => {
@@ -336,6 +359,12 @@ export default function App() {
           </View>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => setHistoryModalVisible(true)}
+          >
+            <History size={19} color={CONFIG.COLORS.textLight} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={onRefresh}>
             <RefreshCw size={19} color={CONFIG.COLORS.textLight} />
           </TouchableOpacity>
@@ -397,6 +426,11 @@ export default function App() {
                   <ArrowRight size={13} color="#10B981" />
                 </View>
               </TouchableOpacity>
+            )}
+
+            {/* ALERTA INTELIGENTE DE CORTES Y VENCIMIENTOS */}
+            {dashboardData && (
+              <DueDateAlertBanner dashboardData={dashboardData} />
             )}
 
             {/* HERO CARD DE SALDOS */}
@@ -499,22 +533,13 @@ export default function App() {
               </View>
 
               {/* BARRA DE CONSUMO DE SALIDAS */}
-              <View style={styles.progressBarTrack}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      width: `${Math.max(5, Math.min(100, salidasPorcentaje))}%`,
-                      backgroundColor:
-                        salidasPorcentaje > 40
-                          ? CONFIG.COLORS.accentMint
-                          : salidasPorcentaje > 15
-                          ? CONFIG.COLORS.accentGold
-                          : CONFIG.COLORS.accentRed
-                    }
-                  ]}
-                />
-              </View>
+              <BudgetProgressBar
+                disponible={salidasManejo}
+                presupuesto={salidasPresupuestoQ}
+                size="medium"
+                showLabel={false}
+                style={{ marginTop: 10, marginBottom: 6 }}
+              />
 
               <Text style={styles.salidasTipText}>
                 💡 Registra salidas escribiendo en el chat: "Gasté 35k en restaurante"
@@ -729,36 +754,13 @@ export default function App() {
               Toca cualquier rubro para registrar un gasto o marcar su pago:
             </Text>
 
-            {/* LISTA DE RUBROS EN MANEJO */}
+            {/* LISTA DE RUBROS EN MANEJO CON BARRAS DE PROGRESO */}
             {(activeAccount === 'nomina' ? dashboardData?.nomina.gastos : dashboardData?.bonos.gastos)?.map((gasto, idx) => (
-              <TouchableOpacity
+              <CategoryProgressCard
                 key={idx}
-                style={styles.manejoItemCard}
-                activeOpacity={0.7}
+                item={gasto}
                 onPress={() => handleOpenExpenseModal(gasto, activeAccount)}
-              >
-                <View style={styles.manejoTopRow}>
-                  <Text style={styles.manejoItemName}>{gasto.nombre}</Text>
-                  <Text style={styles.manejoItemBalance}>
-                    {formatCOP(gasto.manejoActual)}
-                  </Text>
-                </View>
-                <View style={styles.manejoBottomRow}>
-                  <Text style={styles.manejoPresupuestoText}>
-                    Presupuestado: {formatCOP(gasto.presupuestoTotal)}
-                  </Text>
-                  {gasto.manejoActual === 0 ? (
-                    <View style={styles.statusBadgeCompleted}>
-                      <CheckCircle2 size={13} color="#10B981" />
-                      <Text style={styles.statusBadgeTextCompleted}>Al día / Pagado</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.statusBadgePending}>
-                      <Text style={styles.statusBadgeTextPending}>Disponible</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+              />
             ))}
           </View>
         )}
@@ -1325,6 +1327,12 @@ export default function App() {
         onClose={() => setInboxModalVisible(false)}
         dashboardData={dashboardData}
         onGastosActualizados={fetchDashboard}
+      />
+
+      {/* HISTORIAL DE MOVIMIENTOS */}
+      <TransactionHistoryModal
+        visible={historyModalVisible}
+        onClose={() => setHistoryModalVisible(false)}
       />
       </SafeAreaView>
     </SafeAreaProvider>

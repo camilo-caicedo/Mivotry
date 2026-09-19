@@ -90,6 +90,9 @@ function doPost(e) {
       case "aprobarLoteNotificaciones":
         return createJsonResponse(aprobarLoteNotificaciones(contents));
         
+      case "getHistorialLogs":
+        return createJsonResponse(getHistorialLogs(contents.limit));
+        
       default:
         return createJsonResponse({ success: false, error: "Acción no reconocida: " + action });
     }
@@ -868,6 +871,73 @@ function logTransaction(ss, data) {
     data.saldoRestante || 0,
     data.origen || "app"
   ]);
+}
+
+/**
+ * Obtiene el historial de registros de la hoja Transacciones_Log
+ * @param {number} limit Máximo número de filas a retornar (default: 60)
+ * @returns {Object} { success: true, total: number, logs: Array }
+ */
+function getHistorialLogs(limit) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logSheet = ensureLogSheetExists(ss);
+  const lastRow = logSheet.getLastRow();
+  
+  if (lastRow <= 1) {
+    return { success: true, total: 0, logs: [] };
+  }
+  
+  const maxRows = Number(limit) > 0 ? Number(limit) : 60;
+  const totalDataRows = lastRow - 1;
+  const rowsToFetch = Math.min(totalDataRows, maxRows);
+  const startRow = lastRow - rowsToFetch + 1;
+  
+  const values = logSheet.getRange(startRow, 1, rowsToFetch, 9).getValues();
+  const logs = [];
+  
+  // Orden descendente (más reciente primero):
+  for (let i = values.length - 1; i >= 0; i--) {
+    const row = values[i];
+    
+    let ts = row[0];
+    if (ts instanceof Date) {
+      ts = ts.toISOString();
+    } else {
+      ts = String(ts || "");
+    }
+    
+    let fecha = row[1];
+    if (fecha instanceof Date) {
+      fecha = Utilities.formatDate(fecha, "America/Bogota", "yyyy-MM-dd");
+    } else {
+      fecha = String(fecha || "");
+    }
+    
+    let hora = row[2];
+    if (hora instanceof Date) {
+      hora = Utilities.formatDate(hora, "America/Bogota", "HH:mm:ss");
+    } else {
+      hora = String(hora || "");
+    }
+    
+    logs.push({
+      timestamp: ts,
+      fecha: fecha,
+      hora: hora,
+      cuenta: String(row[3] || ""),
+      categoria: String(row[4] || ""),
+      concepto: String(row[5] || ""),
+      monto: cleanNumber(row[6]),
+      saldoRestante: cleanNumber(row[7]),
+      origen: String(row[8] || "")
+    });
+  }
+  
+  return {
+    success: true,
+    total: logs.length,
+    logs: logs
+  };
 }
 
 /**

@@ -44,6 +44,18 @@ export interface TarjetaCreditoItem {
   fechaPago: string;
 }
 
+export interface LogItem {
+  timestamp: string;
+  fecha: string;
+  hora: string;
+  cuenta: string;
+  categoria: string;
+  concepto: string;
+  monto: number;
+  saldoRestante: number;
+  origen: string;
+}
+
 export interface DashboardResponse {
   nomina: {
     quincenaBase: number;
@@ -292,6 +304,20 @@ export const MivotryAPI = {
         operacion: params.operacion || 'sumar',
         concepto: params.concepto,
         fila: params.fila
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Obtiene el historial reciente de transacciones registradas en Transacciones_Log
+   */
+  async getHistorialLogs(limit?: number): Promise<{ success: boolean; total: number; logs: LogItem[] }> {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'getHistorialLogs',
+        limit
       })
     });
     return await res.json();
