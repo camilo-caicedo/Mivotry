@@ -25,10 +25,13 @@ import {
   Sparkles,
   Server,
   Zap,
+  Bell,
+  Calendar,
 } from 'lucide-react-native';
 import { CONFIG } from '../config';
 import { cacheService } from '../services/cacheService';
 import { DashboardResponse } from '../services/api';
+import { NotificationService } from '../services/notificationService';
 import { theme } from '../theme';
 
 export interface AdminScreenProps {
@@ -121,6 +124,35 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
   const handleManualSync = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     onRefresh();
+  };
+
+  const handleScheduleReminders = async () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    if (!dashboardData) {
+      Alert.alert('Aviso', 'Sincroniza el dashboard primero para programar los recordatorios.');
+      return;
+    }
+    try {
+      const count = await NotificationService.syncScheduledReminders(dashboardData);
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      Alert.alert(
+        'Alertas Programadas',
+        `Se han programado ${count} recordatorios de cortes y quincenas en tu dispositivo.`
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'No se pudieron programar las alertas.');
+    }
+  };
+
+  const handleSendTestNotification = async () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await NotificationService.sendTestNotification();
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      Alert.alert('¡Notificación enviada!', 'Revisa la barra de notificaciones de tu dispositivo.');
+    } catch (err: any) {
+      Alert.alert('Permiso Requerido', err.message || 'Por favor habilita los permisos de notificación.');
+    }
   };
 
   const maskedApiUrl = useMemo(() => {
@@ -315,7 +347,52 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
         </View>
       </View>
 
-      {/* 4. METADATOS DE LA APP */}
+      {/* 4. NOTIFICACIONES PUSH DEL DISPOSITIVO */}
+      <View style={styles.sectionHeaderRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Notificaciones Push</Text>
+          <Text style={styles.sectionSubtitle}>Alertas automáticas de cortes y quincenas</Text>
+        </View>
+        <Bell size={18} color={theme.colors.accentMint} />
+      </View>
+
+      <View style={styles.doubleBezelOuter}>
+        <View style={styles.doubleBezelInner}>
+          <View style={styles.actionCardTop}>
+            <View style={[styles.actionIconBox, { backgroundColor: theme.colors.accentMintMuted }]}>
+              <Bell size={18} color={theme.colors.accentMint} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionCardTitle}>Recordatorios en el Teléfono</Text>
+              <Text style={styles.actionCardDesc}>
+                Programa alertas locales para avisarte 1 día antes del corte de tus tarjetas de crédito y del cierre de quincena.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.notificationActionGrid}>
+            <TouchableOpacity
+              style={styles.primaryActionBtn}
+              activeOpacity={0.8}
+              onPress={handleScheduleReminders}
+            >
+              <Calendar size={14} color="#06181D" />
+              <Text style={styles.primaryActionBtnText}>Programar Alertas</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryActionBtn}
+              activeOpacity={0.8}
+              onPress={handleSendTestNotification}
+            >
+              <Sparkles size={14} color={theme.colors.accentMint} />
+              <Text style={styles.secondaryActionBtnText}>Probar Notificación</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* 5. METADATOS DE LA APP */}
       <View style={styles.sectionHeaderRow}>
         <View>
           <Text style={styles.sectionTitle}>Metadatos de la App</Text>
@@ -632,7 +709,13 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.xs,
     lineHeight: 17,
   },
+  notificationActionGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
   primaryActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -642,9 +725,26 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   primaryActionBtnText: {
-    color: '#06181D',
+    fontFamily: theme.fonts.bold,
+    color: '#060D0F',
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.bold,
+  },
+  secondaryActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.surface2,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    paddingVertical: 11,
+    borderRadius: theme.radius.md,
+  },
+  secondaryActionBtnText: {
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.accentMint,
+    fontSize: theme.fontSizes.sm,
   },
   dangerActionBtn: {
     flexDirection: 'row',
