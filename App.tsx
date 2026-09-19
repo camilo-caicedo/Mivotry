@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +46,7 @@ import { PrimaInjectionModal } from './src/components/PrimaInjectionModal';
 import { cacheService } from './src/services/cacheService';
 import { GastoItem } from './src/services/api';
 import { QuickActionItem } from './src/services/quickActionsService';
+import { NotificationService } from './src/services/notificationService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
@@ -74,6 +75,14 @@ export default function App() {
     salidasPresupuestoQ,
     porcentajeManejo
   } = useDashboardData();
+
+  // Solicitar permisos de notificaciones al arrancar (una sola vez, cuando las fuentes están listas)
+  useEffect(() => {
+    if (fontsLoaded) {
+      NotificationService.requestPermissions().catch(() => {});
+      NotificationService.setupChannels().catch(() => {});
+    }
+  }, [fontsLoaded]);
 
   const {
     smsModalVisible,
