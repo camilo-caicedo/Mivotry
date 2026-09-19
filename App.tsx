@@ -40,7 +40,9 @@ import {
   ShieldCheck,
   Clock,
   Inbox,
-  History
+  History,
+  PieChart,
+  ArrowLeftRight
 } from 'lucide-react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -53,6 +55,9 @@ import { TransactionHistoryModal } from './src/components/TransactionHistoryModa
 import { DueDateAlertBanner } from './src/components/DueDateAlertBanner';
 import { CategoryProgressCard } from './src/components/CategoryProgressCard';
 import { BudgetProgressBar } from './src/components/BudgetProgressBar';
+import { BonosDashboardWidget } from './src/components/BonosDashboardWidget';
+import { SpendingChartsModal } from './src/components/SpendingChartsModal';
+import { TransferOrAddMoneyModal } from './src/components/TransferOrAddMoneyModal';
 import { cacheService } from './src/services/cacheService';
 
 const { width } = Dimensions.get('window');
@@ -82,6 +87,11 @@ export default function App() {
   const [submittingPrima, setSubmittingPrima] = useState(false);
   const [inboxModalVisible, setInboxModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [chartsModalVisible, setChartsModalVisible] = useState(false);
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [transferInitialMode, setTransferInitialMode] = useState<'add' | 'transfer'>('add');
+  const [transferInitialAccount, setTransferInitialAccount] = useState<'nomina' | 'bonos' | 'bolsillos'>('nomina');
+  const [transferInitialCategory, setTransferInitialCategory] = useState<string | undefined>(undefined);
 
   const handleInyectarPrima = async () => {
     const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
@@ -335,11 +345,23 @@ export default function App() {
     : (bolsillosData?.pagosAnuales === 6800000 ? 1000000 : (bolsillosData?.pagosAnuales ?? 1000000));
 
   // Pagos Anuales & Primas Semestrales (Columnas K a O, filas 25 a 29)
+  // Regla de negocio: El Predial ($1.551.250) sale 100% de Cesantías (fuera del presupuesto mensual),
+  // por lo que se excluye de las obligaciones que requieren ahorro de bolsillos / primas habituales.
   const pagosAnualesList = dashboardData?.pagosAnuales || [];
-  const totalCostoAnual = pagosAnualesList.reduce((acc, p) => acc + (p.costoEstimado || 0), 0) || 3121250;
-  const totalAhorradoAnual = (pagosAnualesList.reduce((acc, p) => acc + (p.ahorrado || 0), 0) || 1700000) + pagosAnualesVal;
-  const pctCubiertoAnual = totalCostoAnual > 0 ? Math.min(100, Math.round((totalAhorradoAnual / totalCostoAnual) * 100)) : 0;
-  const proximoPagoPendiente = pagosAnualesList.find(p => p.estado.toLowerCase() !== 'pagado');
+  const obligacionesAnualesSinPredial = pagosAnualesList.filter(
+    p => !(p.concepto || '').toLowerCase().includes('predial')
+  );
+  const totalCostoAnual =
+    obligacionesAnualesSinPredial.reduce((acc, p) => acc + (p.costoEstimado || 0), 0) || 1570000;
+  const totalAhorradoAnual =
+    obligacionesAnualesSinPredial.reduce((acc, p) => acc + (p.ahorrado || 0), 0) + pagosAnualesVal;
+  const pctCubiertoAnual =
+    totalCostoAnual > 0
+      ? Math.min(100, Math.round((totalAhorradoAnual / totalCostoAnual) * 100))
+      : 0;
+  const proximoPagoPendiente = obligacionesAnualesSinPredial.find(
+    p => p.estado.toLowerCase() !== 'pagado'
+  );
 
   return (
     <SafeAreaProvider>
@@ -359,6 +381,21 @@ export default function App() {
           </View>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => setChartsModalVisible(true)}
+          >
+            <PieChart size={19} color={CONFIG.COLORS.accentMint} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              setTransferInitialMode('transfer');
+              setTransferModalVisible(true);
+            }}
+          >
+            <ArrowLeftRight size={19} color={CONFIG.COLORS.accentMint} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setHistoryModalVisible(true)}
@@ -544,6 +581,63 @@ export default function App() {
               <Text style={styles.salidasTipText}>
                 💡 Registra salidas escribiendo en el chat: "Gasté 35k en restaurante"
               </Text>
+            </View>
+
+            {/* WIDGET INTEGRADO DE TARJETA DE BONOS SODEXO / PLUXEE */}
+            <BonosDashboardWidget
+              bonosData={dashboardData?.bonos}
+              onPressCategory={(gasto) => handleOpenExpenseModal(gasto, 'bonos')}
+              onRechargePress={() => {
+                setTransferInitialMode('add');
+                setTransferInitialAccount('bonos');
+                setTransferModalVisible(true);
+              }}
+              onQuickExpensePress={() => {
+                const firstBono = dashboardData?.bonos?.gastos?.[0] || {
+                  fila: 24,
+                  nombre: 'Pricesmart',
+                  presupuestoTotal: 700000,
+                  manejoActual: 0
+                };
+                handleOpenExpenseModal(firstBono, 'bonos');
+              }}
+              style={{ marginHorizontal: 16, marginBottom: 14 }}
+            />
+
+            {/* ACCESOS RÁPIDOS: ESTADÍSTICAS Y TRANSFERENCIAS */}
+            <View style={styles.quickActionsDashboardRow}>
+              <TouchableOpacity
+                style={styles.quickActionDashboardCard}
+                activeOpacity={0.8}
+                onPress={() => setChartsModalVisible(true)}
+              >
+                <View style={[styles.quickActionIconWrap, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                  <PieChart size={18} color="#38BDF8" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quickActionTitle}>Gráficos de Consumo</Text>
+                  <Text style={styles.quickActionSub}>Torta & Comparativas</Text>
+                </View>
+                <ArrowRight size={14} color="#64748B" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionDashboardCard}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setTransferInitialMode('transfer');
+                  setTransferModalVisible(true);
+                }}
+              >
+                <View style={[styles.quickActionIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                  <ArrowLeftRight size={18} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quickActionTitle}>Mover Dinero</Text>
+                  <Text style={styles.quickActionSub}>Ajustar o Recargar</Text>
+                </View>
+                <ArrowRight size={14} color="#64748B" />
+              </TouchableOpacity>
             </View>
 
             {/* TARJETA ACCESO RÁPIDO: DETECTOR DE SMS BANCARIOS */}
@@ -734,7 +828,22 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-                        {/* BANNER DE RECARGA PEOPLEPASS PAYCASH (DÍA 15) */}
+            {/* ACCIÓN RÁPIDA: INYECTAR O MOVER DINERO */}
+            <TouchableOpacity
+              style={styles.transferManejoBannerBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                setTransferInitialAccount(activeAccount);
+                setTransferModalVisible(true);
+              }}
+            >
+              <ArrowLeftRight size={15} color="#10B981" />
+              <Text style={styles.transferManejoBannerBtnText}>
+                Añadir fondos o mover dinero entre rubros
+              </Text>
+            </TouchableOpacity>
+
+            {/* BANNER DE RECARGA PEOPLEPASS PAYCASH (DÍA 15) */}
             {activeAccount === 'bonos' && (
               <View style={styles.peoplepassBanner}>
                 <View style={{ flex: 1 }}>
@@ -859,7 +968,7 @@ export default function App() {
               <View style={styles.debtRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.debtName}>Ahorro pagos anuales</Text>
-                  <Text style={styles.debtMeta}>Fila 29 • SOAT, Predial, Impuestos (Primas)</Text>
+                  <Text style={styles.debtMeta}>Fila 29 • SOAT, Tecno, Impuestos (Primas) • Predial vía Cesantías</Text>
                 </View>
                 <Text style={[styles.debtAmount, { color: CONFIG.COLORS.accentMint }]}>
                   {formatCOP(pagosAnualesVal)}
@@ -964,6 +1073,7 @@ export default function App() {
               {pagosAnualesList.length > 0 ? (
                 pagosAnualesList.map((pago, idx) => {
                   const isPaid = pago.estado.toLowerCase() === 'pagado';
+                  const isPredial = (pago.concepto || '').toLowerCase().includes('predial');
                   return (
                     <React.Fragment key={idx}>
                       <TouchableOpacity
@@ -976,15 +1086,27 @@ export default function App() {
                             <Text style={[styles.debtName, isPaid && styles.annualItemPaid]}>
                               {pago.concepto}
                             </Text>
-                            <View style={isPaid ? styles.statusBadgePaidSmall : styles.statusBadgePendingSmall}>
-                              <Text style={isPaid ? styles.statusBadgeTextPaidSmall : styles.statusBadgeTextPendingSmall}>
-                                {pago.mesPago}
-                              </Text>
-                            </View>
+                            {isPredial ? (
+                              <View style={styles.statusBadgeCesantiasSmall}>
+                                <Text style={styles.statusBadgeTextCesantiasSmall}>
+                                  Cesantías
+                                </Text>
+                              </View>
+                            ) : (
+                              <View style={isPaid ? styles.statusBadgePaidSmall : styles.statusBadgePendingSmall}>
+                                <Text style={isPaid ? styles.statusBadgeTextPaidSmall : styles.statusBadgeTextPendingSmall}>
+                                  {pago.mesPago}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                           <Text style={styles.debtMeta}>
                             Estimado: {formatCOP(pago.costoEstimado)}
-                            {pago.ahorrado > 0 ? ` • Ahorro asignado: ${formatCOP(pago.ahorrado)}` : ''}
+                            {isPredial
+                              ? ' • Cubierto con Cesantías (no requiere ahorro mensual)'
+                              : pago.ahorrado > 0
+                              ? ` • Ahorro asignado: ${formatCOP(pago.ahorrado)}`
+                              : ''}
                           </Text>
                         </View>
                         <View style={[styles.annualToggleBadge, isPaid ? styles.annualBadgePaid : styles.annualBadgePending]}>
@@ -1333,6 +1455,24 @@ export default function App() {
       <TransactionHistoryModal
         visible={historyModalVisible}
         onClose={() => setHistoryModalVisible(false)}
+      />
+
+      {/* GRÁFICOS Y ANALÍTICA DE CONSUMO */}
+      <SpendingChartsModal
+        visible={chartsModalVisible}
+        onClose={() => setChartsModalVisible(false)}
+        dashboardData={dashboardData}
+      />
+
+      {/* MODAL PARA INYECTAR O TRANSFERIR DINERO ENTRE RUBROS */}
+      <TransferOrAddMoneyModal
+        visible={transferModalVisible}
+        onClose={() => setTransferModalVisible(false)}
+        onSuccess={() => fetchDashboard(false)}
+        dashboardData={dashboardData}
+        initialMode={transferInitialMode}
+        initialAccount={transferInitialAccount}
+        initialCategory={transferInitialCategory}
       />
       </SafeAreaView>
     </SafeAreaProvider>
@@ -2494,6 +2634,75 @@ const styles = StyleSheet.create({
   },
   tcDetalleVal: {
     fontSize: 12,
+    fontWeight: '700'
+  },
+  // ACCIONES RÁPIDAS DASHBOARD
+  quickActionsDashboardRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 14
+  },
+  quickActionDashboardCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F3741',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 10
+  },
+  quickActionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  quickActionTitle: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  quickActionSub: {
+    color: '#94A3B8',
+    fontSize: 10,
+    marginTop: 1
+  },
+  // BOTÓN INYECTAR / TRANSFERIR EN MANEJO
+  transferManejoBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14
+  },
+  transferManejoBannerBtnText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  // BADGE CESANTÍAS (PREDIAL)
+  statusBadgeCesantiasSmall: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  statusBadgeTextCesantiasSmall: {
+    color: '#C084FC',
+    fontSize: 10,
     fontWeight: '700'
   }
 });

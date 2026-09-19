@@ -51,6 +51,12 @@ function doPost(e) {
       case "registrarGasto":
         return createJsonResponse(registrarGasto(contents));
         
+      case "agregarDineroRubro":
+        return createJsonResponse(agregarDineroRubro(contents));
+        
+      case "transferirDineroRubros":
+        return createJsonResponse(transferirDineroRubros(contents));
+        
       case "cargarQuincena":
         return createJsonResponse(cargarQuincena(contents));
         
@@ -152,7 +158,10 @@ function getDashboardData() {
   const totalManejoCalculadoSheet = cleanNumber(sheet.getRange("F21").getValue()); // $585,000
   
   // D. Tarjeta de Bonos (Filas 23 a 27, Columnas A a C)
-  const bonosPresupuestoTotal = cleanNumber(sheet.getRange("B22").getValue()); // $1,600,000
+  let bonosPresupuestoTotal = cleanNumber(sheet.getRange("B22").getValue()); // $1,600,000
+  if (bonosPresupuestoTotal <= 0) {
+    bonosPresupuestoTotal = cleanNumber(sheet.getRange("B23").getValue()) || 1600000;
+  }
   const rowsBonos = sheet.getRange("A23:C27").getValues();
   const gastosBonos = [];
   
@@ -604,7 +613,192 @@ function actualizarAhorroPagosAnuales(payload) {
 
 /**
  * =========================================================================
- * 6B. ACTUALIZAR ESTADO DE PAGO ANUAL (PAGADO / PENDIENTE)
+ * 6B. GESTIÓN DE SALDOS Y TRANSFERENCIA DE RUBROS
+ * =========================================================================
+ */
+
+/**
+ * Localiza la fila y columna correspondiente para un rubro/categoría
+ * - Nómina: filas 4-19, col F (col 6)
+ * - Bonos: filas 23-27, col C (col 3)
+ * - Bolsillos: filas 25-29, col I (col 9) o F20 para Fondo Ocasional
+ */
+function findRubroCell(sheet, cuenta, categoria) {
+  const c = String(cuenta || "").trim().toLowerCase();
+  const cat = String(categoria || "").trim();
+  const catLower = cat.toLowerCase();
+  if (!catLower) return null;
+
+  // Fondo Ocasional / Vacaciones (F20)
+  if (catLower.includes("fondo ocasional") || catLower.includes("vacaciones")) {
+    return { row: 20, col: 6, nombre: "Fondo Ocasional / Vacaciones" };
+  }
+
+  if (c.includes("nomina")) {
+    const values = sheet.getRange("A4:A19").getValues();
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && val.toLowerCase() === catLower) {
+        return { row: 4 + i, col: 6, nombre: val };
+      }
+    }
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && (val.toLowerCase().includes(catLower) || catLower.includes(val.toLowerCase()))) {
+        return { row: 4 + i, col: 6, nombre: val };
+      }
+    }
+  } else if (c.includes("bono")) {
+    const values = sheet.getRange("A23:A27").getValues();
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && val.toLowerCase() === catLower) {
+        return { row: 23 + i, col: 3, nombre: val };
+      }
+    }
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && (val.toLowerCase().includes(catLower) || catLower.includes(val.toLowerCase()))) {
+        return { row: 23 + i, col: 3, nombre: val };
+      }
+    }
+  } else if (c.includes("bolsillo")) {
+    const values = sheet.getRange("H25:H29").getValues();
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && val.toLowerCase() === catLower) {
+        return { row: 25 + i, col: 9, nombre: val };
+      }
+    }
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i][0] || "").trim();
+      if (val && (val.toLowerCase().includes(catLower) || catLower.includes(val.toLowerCase()))) {
+        return { row: 25 + i, col: 9, nombre: val };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Agrega saldo directo a un rubro/categoría específico
+ * @param {Object} payload { cuenta: 'nomina' | 'bonos' | 'bolsillos', categoria: string, monto: number, concepto?: string, origen?: string }
+ */
+function agregarDineroRubro(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+  if (!sheet) return { success: false, error: "No se encontró la hoja " + SHEET_NAME_GASTOS };
+  
+  const cuenta = String(payload.cuenta || "nomina").trim().toLowerCase();
+  const categoria = String(payload.categoria || "").trim();
+  const monto = cleanNumber(payload.monto);
+  const concepto = String(payload.concepto || ("Inyección a " + categoria)).trim();
+  const origen = String(payload.origen || "manual").trim();
+  
+  if (monto <= 0) {
+    return { success: false, error: "El monto debe ser mayor a cero" };
+  }
+  
+  const target = findRubroCell(sheet, cuenta, categoria);
+  if (!target) {
+    return { success: false, error: "No se encontró el rubro '" + categoria + "' en la cuenta '" + cuenta + "'" };
+  }
+  
+  const cell = sheet.getRange(target.row, target.col);
+  const saldoActual = cleanNumber(cell.getValue());
+  const nuevoSaldo = saldoActual + monto;
+  
+  cell.setValue(nuevoSaldo);
+  
+  logTransaction(ss, {
+    cuenta: cuenta,
+    categoria: target.nombre || categoria,
+    concepto: concepto + " (+$" + monto + ")",
+    monto: monto,
+    saldoRestante: nuevoSaldo,
+    origen: origen
+  });
+  
+  return {
+    success: true,
+    cuenta: cuenta,
+    categoria: target.nombre || categoria,
+    montoAgregado: monto,
+    saldoAnterior: saldoActual,
+    nuevoSaldo: nuevoSaldo
+  };
+}
+
+/**
+ * Transfiere presupuesto entre dos rubros (origen -> destino)
+ * @param {Object} payload { cuentaOrigen: string, categoriaOrigen: string, cuentaDestino: string, categoriaDestino: string, monto: number, concepto?: string }
+ */
+function transferirDineroRubros(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_GASTOS);
+  if (!sheet) return { success: false, error: "No se encontró la hoja " + SHEET_NAME_GASTOS };
+  
+  const cuentaOrigen = String(payload.cuentaOrigen || "nomina").trim().toLowerCase();
+  const categoriaOrigen = String(payload.categoriaOrigen || "").trim();
+  const cuentaDestino = String(payload.cuentaDestino || "nomina").trim().toLowerCase();
+  const categoriaDestino = String(payload.categoriaDestino || "").trim();
+  const monto = cleanNumber(payload.monto);
+  const concepto = String(payload.concepto || ("Transferencia de " + categoriaOrigen + " a " + categoriaDestino)).trim();
+  const origen = String(payload.origen || "transferencia").trim();
+  
+  if (monto <= 0) {
+    return { success: false, error: "El monto a transferir debe ser mayor a cero" };
+  }
+  
+  const targetOrigen = findRubroCell(sheet, cuentaOrigen, categoriaOrigen);
+  if (!targetOrigen) {
+    return { success: false, error: "No se encontró el rubro origen '" + categoriaOrigen + "' en '" + cuentaOrigen + "'" };
+  }
+  
+  const targetDestino = findRubroCell(sheet, cuentaDestino, categoriaDestino);
+  if (!targetDestino) {
+    return { success: false, error: "No se encontró el rubro destino '" + categoriaDestino + "' en '" + cuentaDestino + "'" };
+  }
+  
+  const cellOrigen = sheet.getRange(targetOrigen.row, targetOrigen.col);
+  const cellDestino = sheet.getRange(targetDestino.row, targetDestino.col);
+  
+  const saldoOrigenActual = cleanNumber(cellOrigen.getValue());
+  const saldoDestinoActual = cleanNumber(cellDestino.getValue());
+  
+  const nuevoSaldoOrigen = saldoOrigenActual - monto;
+  const nuevoSaldoDestino = saldoDestinoActual + monto;
+  
+  cellOrigen.setValue(nuevoSaldoOrigen);
+  cellDestino.setValue(nuevoSaldoDestino);
+  
+  logTransaction(ss, {
+    cuenta: cuentaOrigen + " -> " + cuentaDestino,
+    categoria: targetOrigen.nombre + " -> " + targetDestino.nombre,
+    concepto: concepto + " ($" + monto + ")",
+    monto: monto,
+    saldoRestante: nuevoSaldoDestino,
+    origen: origen
+  });
+  
+  return {
+    success: true,
+    cuentaOrigen: cuentaOrigen,
+    categoriaOrigen: targetOrigen.nombre,
+    saldoAnteriorOrigen: saldoOrigenActual,
+    nuevoSaldoOrigen: nuevoSaldoOrigen,
+    cuentaDestino: cuentaDestino,
+    categoriaDestino: targetDestino.nombre,
+    saldoAnteriorDestino: saldoDestinoActual,
+    nuevoSaldoDestino: nuevoSaldoDestino,
+    montoTransferido: monto
+  };
+}
+
+/**
+ * =========================================================================
+ * 6C. ACTUALIZAR ESTADO DE PAGO ANUAL (PAGADO / PENDIENTE)
  * =========================================================================
  */
 function actualizarEstadoPagoAnual(payload) {

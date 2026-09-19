@@ -309,9 +309,14 @@ export function getDueDatesSummary(dashboard: DashboardResponse | null | undefin
     });
   }
 
-  // 2. ANÁLISIS DE PAGOS ANUALES
+  // 2. ANÁLISIS DE PAGOS ANUALES (Excluye Predial porque se financia con Cesantías)
   const pagosAnuales: PagoAnualItem[] = dashboard.pagosAnuales || [];
   for (const pago of pagosAnuales) {
+    // Predial no sale de bolsillos ni de ahorro mensual habitual, sale de cesantías
+    if ((pago.concepto || '').toLowerCase().includes('predial')) {
+      continue;
+    }
+
     const { diasRestantes, fechaTexto } = getDaysUntilAnnualPayment(pago, now);
     const esPagado = (pago.estado || '').trim().toLowerCase() === 'pagado';
 

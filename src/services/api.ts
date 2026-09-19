@@ -102,6 +102,22 @@ export interface DashboardResponse {
   totalNotificacionesPendientes?: number;
 }
 
+export interface AgregarDineroPayload {
+  cuenta: 'nomina' | 'bonos' | 'bolsillos';
+  categoria: string;
+  monto: number;
+  concepto?: string;
+}
+
+export interface TransferirDineroPayload {
+  cuentaOrigen: 'nomina' | 'bonos' | 'bolsillos';
+  categoriaOrigen: string;
+  cuentaDestino: 'nomina' | 'bonos' | 'bolsillos';
+  categoriaDestino: string;
+  monto: number;
+  concepto?: string;
+}
+
 export const MivotryAPI = {
   /**
    * Obtiene todos los datos en vivo del Google Sheet
@@ -318,6 +334,34 @@ export const MivotryAPI = {
       body: JSON.stringify({
         action: 'getHistorialLogs',
         limit
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Añade dinero/saldo directamente a un rubro (Nómina, Bonos o Bolsillos)
+   */
+  async agregarDineroRubro(payload: AgregarDineroPayload): Promise<{ success: boolean; nuevoSaldo?: number; error?: string }> {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'agregarDineroRubro',
+        ...payload
+      })
+    });
+    return await res.json();
+  },
+
+  /**
+   * Transfiere dinero de un rubro origen a un rubro destino
+   */
+  async transferirDineroRubros(payload: TransferirDineroPayload): Promise<{ success: boolean; nuevoSaldoOrigen?: number; nuevoSaldoDestino?: number; error?: string }> {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'transferirDineroRubros',
+        ...payload
       })
     });
     return await res.json();
