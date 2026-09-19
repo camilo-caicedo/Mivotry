@@ -11,10 +11,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Animated
+  Animated,
+  Keyboard
 } from 'react-native';
 import { Send, Sparkles, CheckCircle2, XCircle, ArrowRight, CornerDownRight, Mic, X } from 'lucide-react-native';
 import { CONFIG } from '../config';
+import { theme } from '../theme';
 import { MivotryAPI, DashboardResponse } from '../services/api';
 import { VoiceService } from '../services/voiceService';
 
@@ -61,10 +63,33 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
   const [processing, setProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Monitor keyboard to adjust input bar clearance above FloatingTabBar
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -425,8 +450,8 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}
       style={styles.container}
     >
       <FlatList
@@ -487,16 +512,18 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
                   </View>
                 )}
 
+                {/* BADGE DE CONFIRMADO */}
                 {item.actionCard?.confirmed && (
                   <View style={styles.statusBadgeSuccess}>
                     <CheckCircle2 size={12} color="#10B981" />
-                    <Text style={styles.statusBadgeTextSuccess}>Registrado en Google Sheets</Text>
+                    <Text style={styles.statusBadgeTextSuccess}>Gasto registrado en Sheets</Text>
                   </View>
                 )}
 
+                {/* BADGE DE CANCELADO */}
                 {item.actionCard?.cancelled && (
                   <View style={styles.statusBadgeCancelled}>
-                    <Text style={styles.statusBadgeTextCancelled}>Cancelado</Text>
+                    <Text style={styles.statusBadgeTextCancelled}>Operación cancelada</Text>
                   </View>
                 )}
               </View>
@@ -552,7 +579,7 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       </View>
 
       {/* INPUT INFERIOR DE MENSAJES */}
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, !isKeyboardVisible && styles.inputBarWithTab]}>
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -605,7 +632,7 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#06181D'
+    backgroundColor: theme.colors.background
   },
   listContent: {
     padding: 16,
@@ -638,16 +665,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)'
   },
   bubbleText: {
+    fontFamily: theme.fonts.regular,
     fontSize: 14,
     lineHeight: 20
   },
   bubbleTextUser: {
-    color: '#F1F5F9'
+    fontFamily: theme.fonts.medium,
+    color: '#F8FAFC'
   },
   bubbleTextAssistant: {
-    color: '#F1F5F9'
+    color: '#F8FAFC'
   },
   bubbleTime: {
+    fontFamily: theme.fonts.regular,
     color: '#94A3B8',
     fontSize: 10,
     alignSelf: 'flex-end',
@@ -668,23 +698,25 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   confirmTitle: {
+    fontFamily: theme.fonts.bold,
     color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700'
+    fontSize: 12
   },
   confirmDetails: {
     gap: 3,
     marginBottom: 10
   },
   confirmRow: {
+    fontFamily: theme.fonts.regular,
     fontSize: 12
   },
   confirmLabel: {
+    fontFamily: theme.fonts.medium,
     color: '#94A3B8'
   },
   confirmValue: {
-    color: '#F1F5F9',
-    fontWeight: '600'
+    fontFamily: theme.fonts.semiBold,
+    color: '#F8FAFC'
   },
   confirmActions: {
     flexDirection: 'row',
@@ -701,9 +733,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.15)'
   },
   cancelBtnText: {
+    fontFamily: theme.fonts.semiBold,
     color: '#EF4444',
-    fontSize: 11,
-    fontWeight: '600'
+    fontSize: 11
   },
   confirmBtn: {
     flexDirection: 'row',
@@ -715,9 +747,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981'
   },
   confirmBtnText: {
-    color: '#06181D',
-    fontSize: 11,
-    fontWeight: '700'
+    fontFamily: theme.fonts.bold,
+    color: '#060D0F',
+    fontSize: 11
   },
   statusBadgeSuccess: {
     flexDirection: 'row',
@@ -731,9 +763,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start'
   },
   statusBadgeTextSuccess: {
+    fontFamily: theme.fonts.semiBold,
     color: '#10B981',
-    fontSize: 10,
-    fontWeight: '600'
+    fontSize: 10
   },
   statusBadgeCancelled: {
     marginTop: 8,
@@ -744,6 +776,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start'
   },
   statusBadgeTextCancelled: {
+    fontFamily: theme.fonts.regular,
     color: '#94A3B8',
     fontSize: 10
   },
@@ -767,7 +800,8 @@ const styles = StyleSheet.create({
   },
   tooltipText: {
     flex: 1,
-    color: '#F1F5F9',
+    fontFamily: theme.fonts.medium,
+    color: '#F8FAFC',
     fontSize: 12,
     lineHeight: 16
   },
@@ -777,7 +811,7 @@ const styles = StyleSheet.create({
   chipsWrapper: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    backgroundColor: '#06181D',
+    backgroundColor: '#081419',
     paddingTop: 8,
     paddingBottom: 4
   },
@@ -786,7 +820,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   quickChip: {
-    backgroundColor: '#0B2B33',
+    backgroundColor: '#0C242C',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
@@ -794,24 +828,28 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.25)'
   },
   quickChipText: {
+    fontFamily: theme.fonts.medium,
     color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '500'
+    fontSize: 12
   },
   inputBar: {
     flexDirection: 'row',
     padding: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#06181D',
+    backgroundColor: '#081419',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     gap: 8
   },
+  inputBarWithTab: {
+    paddingBottom: Platform.OS === 'ios' ? 88 : 82
+  },
   input: {
     flex: 1,
-    backgroundColor: '#0F3741',
-    color: '#F1F5F9',
+    fontFamily: theme.fonts.regular,
+    backgroundColor: '#0C242C',
+    color: '#F8FAFC',
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -823,7 +861,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0F3741',
+    backgroundColor: '#0C242C',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

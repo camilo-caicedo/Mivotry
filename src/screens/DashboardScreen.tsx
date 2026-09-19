@@ -404,7 +404,106 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         }}
       />
 
-      {/* 7. BOLSILLOS Y AHORROS CARD */}
+      {/* 7. TARJETAS DE CRÉDITO & CRÉDITOS PRINCIPALES */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View>
+            <Text style={styles.cardTitle}>Créditos & Tarjetas de Crédito</Text>
+            <Text style={styles.cardDesc}>Obligaciones bancarias principales</Text>
+          </View>
+          <CreditCard size={18} color={theme.colors.textMuted} />
+        </View>
+
+        {/* CRÉDITO OCCIDENTE */}
+        <View style={styles.debtRow}>
+          <View>
+            <Text style={styles.debtName}>Crédito Occidente</Text>
+            <Text style={styles.debtMeta}>
+              Corte: Día {dashboardData?.deudas?.creditoOccidente?.fechaPago || '15'}
+            </Text>
+          </View>
+          <Text style={styles.debtAmount}>
+            {formatCOP(dashboardData?.deudas?.creditoOccidente?.saldo || 170588000)}
+          </Text>
+        </View>
+
+        <View style={styles.debtDivider} />
+
+        {/* CRÉDITO HIPOTECARIO APTO */}
+        <View style={styles.debtRow}>
+          <View>
+            <Text style={styles.debtName}>Crédito Hipotecario Apto</Text>
+            <Text style={styles.debtMeta}>
+              Corte: Día {dashboardData?.deudas?.creditoApto?.fechaPago || '30'}
+            </Text>
+          </View>
+          <Text style={styles.debtAmount}>
+            {formatCOP(dashboardData?.deudas?.creditoApto?.saldo || 75300000)}
+          </Text>
+        </View>
+
+        <View style={styles.debtDivider} />
+
+        {/* TARJETAS DE CRÉDITO TOTAL */}
+        <View style={styles.debtRow}>
+          <View>
+            <Text style={styles.debtName}>Tarjetas de Crédito</Text>
+            <Text style={styles.debtMeta}>
+              {dashboardData?.deudas?.tarjetasDetalle &&
+              dashboardData.deudas.tarjetasDetalle.length > 0
+                ? `${dashboardData.deudas.tarjetasDetalle.length} tarjetas registradas`
+                : 'Infinity (15) / Rappi (30) / Scotia (30)'}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.debtAmount,
+              {
+                color:
+                  (dashboardData?.deudas?.totalDeudaTarjetas || 0) > 0
+                    ? theme.colors.accentRose
+                    : theme.colors.accentMint,
+              },
+            ]}
+          >
+            {formatCOP(dashboardData?.deudas?.totalDeudaTarjetas || 0)}
+          </Text>
+        </View>
+
+        {/* DESGLOSE INDIVIDUAL DE CADA TARJETA */}
+        {dashboardData?.deudas?.tarjetasDetalle &&
+          dashboardData.deudas.tarjetasDetalle.length > 0 && (
+            <View style={styles.tcDetalleList}>
+              {dashboardData.deudas.tarjetasDetalle.map((tc, idx) => (
+                <View key={idx} style={styles.tcDetalleRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.tcDetalleName}>{tc.nombre}</Text>
+                    <View style={styles.tcCorteBadge}>
+                      <Text style={styles.tcCorteBadgeText}>
+                        Día {tc.fechaPago || '15'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.tcDetalleVal,
+                      {
+                        color:
+                          tc.saldo > 0
+                            ? theme.colors.accentGold
+                            : theme.colors.accentMint,
+                      },
+                    ]}
+                  >
+                    {formatCOP(tc.saldo)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+      </View>
+
+      {/* 8. BOLSILLOS Y AHORROS CARD */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View>
@@ -618,106 +717,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
       </View>
 
-      {/* 10. TARJETAS DE CRÉDITO & CRÉDITOS PRINCIPALES */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <View>
-            <Text style={styles.cardTitle}>Créditos & Tarjetas de Crédito</Text>
-            <Text style={styles.cardDesc}>Obligaciones bancarias principales</Text>
-          </View>
-          <CreditCard size={18} color={theme.colors.textMuted} />
-        </View>
-
-        {/* CRÉDITO OCCIDENTE */}
-        <View style={styles.debtRow}>
-          <View>
-            <Text style={styles.debtName}>Crédito Occidente</Text>
-            <Text style={styles.debtMeta}>
-              Corte: Día {dashboardData?.deudas?.creditoOccidente?.fechaPago || '15'}
-            </Text>
-          </View>
-          <Text style={styles.debtAmount}>
-            {formatCOP(dashboardData?.deudas?.creditoOccidente?.saldo || 170588000)}
-          </Text>
-        </View>
-
-        <View style={styles.debtDivider} />
-
-        {/* CRÉDITO HIPOTECARIO APTO */}
-        <View style={styles.debtRow}>
-          <View>
-            <Text style={styles.debtName}>Crédito Hipotecario Apto</Text>
-            <Text style={styles.debtMeta}>
-              Corte: Día {dashboardData?.deudas?.creditoApto?.fechaPago || '30'}
-            </Text>
-          </View>
-          <Text style={styles.debtAmount}>
-            {formatCOP(dashboardData?.deudas?.creditoApto?.saldo || 75300000)}
-          </Text>
-        </View>
-
-        <View style={styles.debtDivider} />
-
-        {/* TARJETAS DE CRÉDITO TOTAL */}
-        <View style={styles.debtRow}>
-          <View>
-            <Text style={styles.debtName}>Tarjetas de Crédito</Text>
-            <Text style={styles.debtMeta}>
-              {dashboardData?.deudas?.tarjetasDetalle &&
-              dashboardData.deudas.tarjetasDetalle.length > 0
-                ? `${dashboardData.deudas.tarjetasDetalle.length} tarjetas registradas`
-                : 'Infinity (15) / Rappi (30) / Scotia (30)'}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.debtAmount,
-              {
-                color:
-                  (dashboardData?.deudas?.totalDeudaTarjetas || 0) > 0
-                    ? theme.colors.accentRose
-                    : theme.colors.accentMint,
-              },
-            ]}
-          >
-            {formatCOP(dashboardData?.deudas?.totalDeudaTarjetas || 0)}
-          </Text>
-        </View>
-
-        {/* DESGLOSE INDIVIDUAL DE CADA TARJETA */}
-        {dashboardData?.deudas?.tarjetasDetalle &&
-          dashboardData.deudas.tarjetasDetalle.length > 0 && (
-            <View style={styles.tcDetalleList}>
-              {dashboardData.deudas.tarjetasDetalle.map((tc, idx) => (
-                <View key={idx} style={styles.tcDetalleRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.tcDetalleName}>{tc.nombre}</Text>
-                    <View style={styles.tcCorteBadge}>
-                      <Text style={styles.tcCorteBadgeText}>
-                        Día {tc.fechaPago || '15'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text
-                    style={[
-                      styles.tcDetalleVal,
-                      {
-                        color:
-                          tc.saldo > 0
-                            ? theme.colors.accentGold
-                            : theme.colors.accentMint,
-                      },
-                    ]}
-                  >
-                    {formatCOP(tc.saldo)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-      </View>
-
-      {/* 11. SERVICIOS STREAMING */}
+      {/* 10. SERVICIOS STREAMING */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View>
@@ -851,9 +851,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   heroLabel: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.medium,
   },
   chipTag: {
     backgroundColor: theme.colors.accentMintMuted,
@@ -864,14 +864,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.2)',
   },
   chipText: {
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.accentMint,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.semiBold,
   },
   heroAmount: {
+    fontFamily: theme.fonts.extraBold,
     color: theme.colors.accentMint,
     fontSize: theme.fontSizes.hero,
-    fontWeight: theme.fontWeights.heavy,
     letterSpacing: theme.letterSpacing.tight,
     marginBottom: 8,
   },
@@ -891,13 +891,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.15)',
   },
   burnRateText: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.medium,
   },
   burnRateHighlight: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.accentMintLight,
-    fontWeight: theme.fontWeights.bold,
   },
 
   // PROGRESO EMBEBIDO
@@ -910,13 +910,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   progressLabel: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
   },
   progressValue: {
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.semiBold,
   },
   progressBarTrack: {
     height: 8,
@@ -949,9 +950,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accentMint,
   },
   quincenaToggleText: {
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.semiBold,
   },
   quincenaToggleTextActive: {
     color: theme.colors.accentMint,
@@ -964,9 +965,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
   },
   cargarBtnText: {
-    color: '#06181D',
+    fontFamily: theme.fonts.bold,
+    color: '#060D0F',
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.bold,
   },
 
   // TARJETA DE SALIDAS & OCIO
@@ -998,11 +999,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   salidasTitle: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.bold,
   },
   salidasSubtitle: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
   },
@@ -1013,9 +1015,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
   },
   salidasDisponibleBadgeText: {
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.accentMint,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.semiBold,
   },
   salidasAmountsRow: {
     flexDirection: 'row',
@@ -1024,11 +1026,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   salidasAmountBig: {
+    fontFamily: theme.fonts.extraBold,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSizes.xxl,
-    fontWeight: theme.fontWeights.heavy,
   },
   salidasAmountSub: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
     marginTop: 2,
@@ -1037,15 +1040,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   salidasPercentText: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.accentMint,
     fontSize: 18,
-    fontWeight: theme.fontWeights.bold,
   },
   salidasPercentLabel: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     fontSize: 10,
   },
   salidasTipText: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textTertiary,
     fontSize: 10,
     marginTop: 10,
@@ -1067,11 +1072,12 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.bold,
   },
   cardDesc: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
     marginTop: 2,
@@ -1092,16 +1098,18 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.surfaceBorder,
   },
   metricLabel: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSizes.xs,
     marginBottom: 4,
   },
   metricValue: {
+    fontFamily: theme.fonts.bold,
     fontSize: 16,
-    fontWeight: theme.fontWeights.bold,
     marginBottom: 2,
   },
   metricSub: {
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textTertiary,
     fontSize: 10,
   },

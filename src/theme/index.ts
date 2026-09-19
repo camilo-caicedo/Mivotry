@@ -1,5 +1,5 @@
 import { colors } from './colors';
-import { fontSizes, fontWeights, letterSpacing, typography } from './typography';
+import { fontFamilies, fontSizes, fontWeights, letterSpacing, typography } from './typography';
 import { spacing, radius } from './spacing';
 import { spring, timing, motion } from './motion';
 
@@ -10,6 +10,8 @@ export * from './motion';
 
 export const theme = {
   colors,
+  fonts: fontFamilies,
+  fontFamilies,
   fontSizes,
   fontWeights,
   letterSpacing,

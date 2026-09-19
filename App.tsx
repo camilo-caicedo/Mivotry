@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold
+} from '@expo-google-fonts/plus-jakarta-sans';
 
 // Design System & Theme
 import { theme } from './src/theme';
@@ -10,7 +18,8 @@ import { theme } from './src/theme';
 import { useDashboardData, useModalManager } from './src/hooks';
 
 // Common Primitives
-import { ScreenHeader, FloatingTabBar, TabKey } from './src/components/common';
+import { ScreenHeader, FloatingTabBar, TabKey, AnimatedPressable } from './src/components/common';
+import { Plus } from 'lucide-react-native';
 
 // Screen Views
 import {
@@ -40,6 +49,14 @@ import { QuickActionItem } from './src/services/quickActionsService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
+
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold
+  });
 
   const {
     loading,
@@ -85,6 +102,19 @@ export default function App() {
     });
   };
 
+  const handleOpenFloatingExpense = () => {
+    const list = activeAccount === 'nomina' ? dashboardData?.nomina?.gastos : dashboardData?.bonos?.gastos;
+    const defaultGasto = list && list.length > 0 ? list[0] : null;
+    if (defaultGasto) {
+      handleOpenManualExpense(defaultGasto, activeAccount);
+    } else {
+      handleOpenManualExpense(
+        { fila: 4, nombre: 'Salidas', presupuestoTotal: 600000, manejoActual: 240000 },
+        'nomina'
+      );
+    }
+  };
+
   const handleSelectQuickAction = (action: QuickActionItem) => {
     openModal('quickAction', { action, mode: 'execute' });
   };
@@ -98,13 +128,15 @@ export default function App() {
     await fetchDashboard(true);
   };
 
-  if (loading && !dashboardData) {
+  if (!fontsLoaded || (loading && !dashboardData)) {
     return (
       <SafeAreaProvider>
         <SafeAreaView style={styles.loadingContainer}>
           <StatusBar style="light" />
           <ActivityIndicator size="large" color={theme.colors.accentMint} />
-          <Text style={styles.loadingText}>Sincronizando con Google Sheets...</Text>
+          <Text style={styles.loadingText}>
+            {!fontsLoaded ? 'Cargando tipografía...' : 'Sincronizando con Google Sheets...'}
+          </Text>
         </SafeAreaView>
       </SafeAreaProvider>
     );
@@ -186,6 +218,19 @@ export default function App() {
             />
           )}
         </View>
+
+        {/* BOTÓN FLOTANTE (FAB) PARA REGISTRAR GASTO */}
+        {(activeTab === 'dashboard' || activeTab === 'manejo') && (
+          <AnimatedPressable
+            style={styles.floatingActionButton}
+            scale={0.92}
+            onPress={handleOpenFloatingExpense}
+            accessibilityLabel="Registrar nuevo gasto"
+          >
+            <Plus size={20} color="#060D0F" strokeWidth={2.8} />
+            <Text style={styles.floatingActionText}>Gasto</Text>
+          </AnimatedPressable>
+        )}
 
         {/* BARRA DE NAVEGACIÓN FLOTANTE */}
         <FloatingTabBar
@@ -309,6 +354,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingText: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     marginTop: 14,
     fontSize: theme.typography.fontSizes.sm
@@ -316,5 +362,28 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     position: 'relative'
+  },
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: 86,
+    right: 18,
+    backgroundColor: theme.colors.accentMint,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 60,
+  },
+  floatingActionText: {
+    fontFamily: theme.fonts.extraBold,
+    color: '#060D0F',
+    fontSize: 14,
   }
 });

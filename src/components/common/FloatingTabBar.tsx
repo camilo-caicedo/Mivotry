@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Keyboard,
+  Platform,
   StyleProp,
   StyleSheet,
   Text,
@@ -127,6 +129,7 @@ const TabButton: React.FC<TabButtonProps> = ({
  * - Active glowing mint pill background with spring indicator.
  * - Chat unread badge counter.
  * - Double-bezel glass styling with ambient drop shadow.
+ * - Auto-hides gracefully when software keyboard appears.
  */
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   activeTab,
@@ -134,8 +137,66 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   chatBadge = 0,
   style,
 }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 120,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          damping: theme.motion.spring.snappy.damping,
+          stiffness: theme.motion.spring.snappy.stiffness,
+          mass: theme.motion.spring.snappy.mass,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [translateY, opacity]);
+
   return (
-    <View style={[styles.floatingContainer, style]}>
+    <Animated.View
+      pointerEvents={isKeyboardVisible ? 'none' : 'auto'}
+      style={[
+        styles.floatingContainer,
+        {
+          transform: [{ translateY }],
+          opacity,
+        },
+        style,
+      ]}
+    >
       <View style={styles.glassPill}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -152,7 +213,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -204,16 +265,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
+    fontFamily: theme.fonts.medium,
     fontSize: 10,
     letterSpacing: 0.2,
   },
   tabLabelActive: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.accentMint,
-    fontWeight: '700',
   },
   tabLabelInactive: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textTertiary,
-    fontWeight: '500',
   },
   tabBadge: {
     position: 'absolute',
@@ -230,9 +292,9 @@ const styles = StyleSheet.create({
     borderColor: '#0C242C',
   },
   tabBadgeText: {
+    fontFamily: theme.fonts.extraBold,
     color: '#060D0F',
     fontSize: 9,
-    fontWeight: '900',
     textAlign: 'center',
   },
 });

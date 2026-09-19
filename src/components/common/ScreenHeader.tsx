@@ -225,9 +225,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   titleText: {
+    fontFamily: theme.fonts.bold,
     color: theme.colors.textPrimary,
     fontSize: 18,
-    fontWeight: '700',
     letterSpacing: 0.3,
   },
   statusRow: {
@@ -254,9 +254,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   subtitleText: {
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     fontSize: 11,
-    fontWeight: '500',
   },
   actionCluster: {
     flexDirection: 'row',
@@ -289,9 +289,9 @@ const styles = StyleSheet.create({
     borderColor: '#060D0F', // matches obsidian canvas background
   },
   notificationBadgeText: {
+    fontFamily: theme.fonts.extraBold,
     color: '#060D0F',
     fontSize: 9,
-    fontWeight: '900',
     textAlign: 'center',
   },
 });

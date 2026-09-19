@@ -1,5 +1,13 @@
 import type { TextStyle } from 'react-native';
 
+export const fontFamilies = {
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semiBold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+  extraBold: 'PlusJakartaSans_800ExtraBold',
+} as const;
+
 export const fontSizes = {
   xs: 11,
   sm: 13,
@@ -28,10 +36,14 @@ export const letterSpacing = {
 } as const;
 
 export const typography = {
+  fontFamilies,
   fontSizes,
   fontWeights,
   letterSpacing,
 } as const;
+
+export type FontFamilies = typeof fontFamilies;
+export type FontFamilyKey = keyof FontFamilies;
 
 export type FontSizes = typeof fontSizes;
 export type FontSizeKey = keyof FontSizes;
