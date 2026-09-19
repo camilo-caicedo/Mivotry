@@ -632,8 +632,7 @@ export const DueDateAlertBanner: React.FC<DueDateAlertBannerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginBottom: 12
+    marginBottom: 14
   },
 
   // PILL CUANDO ESTÁ SILENCIADO (ULTRA DELGADO, LIBERA ESPACIO)

@@ -55,7 +55,9 @@ import { TransactionHistoryModal } from './src/components/TransactionHistoryModa
 import { DueDateAlertBanner } from './src/components/DueDateAlertBanner';
 import { CategoryProgressCard } from './src/components/CategoryProgressCard';
 import { BudgetProgressBar } from './src/components/BudgetProgressBar';
-import { BonosDashboardWidget } from './src/components/BonosDashboardWidget';
+import { BonosCompactCard } from './src/components/BonosCompactCard';
+import { BonosDetailModal } from './src/components/BonosDetailModal';
+import { SalidasDetailModal } from './src/components/SalidasDetailModal';
 import { SpendingChartsModal } from './src/components/SpendingChartsModal';
 import { TransferOrAddMoneyModal } from './src/components/TransferOrAddMoneyModal';
 import { cacheService } from './src/services/cacheService';
@@ -92,6 +94,8 @@ export default function App() {
   const [transferInitialMode, setTransferInitialMode] = useState<'add' | 'transfer'>('add');
   const [transferInitialAccount, setTransferInitialAccount] = useState<'nomina' | 'bonos' | 'bolsillos'>('nomina');
   const [transferInitialCategory, setTransferInitialCategory] = useState<string | undefined>(undefined);
+  const [salidasModalVisible, setSalidasModalVisible] = useState(false);
+  const [bonosModalVisible, setBonosModalVisible] = useState(false);
 
   const handleInyectarPrima = async () => {
     const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
@@ -540,7 +544,11 @@ export default function App() {
             </View>
 
             {/* TARJETA DEDICADA: FONDO DE SALIDAS (GASTOS VARIABLES) */}
-            <View style={styles.salidasCard}>
+            <TouchableOpacity
+              style={styles.salidasCard}
+              activeOpacity={0.85}
+              onPress={() => setSalidasModalVisible(true)}
+            >
               <View style={styles.salidasHeader}>
                 <View style={styles.salidasHeaderLeft}>
                   <View style={styles.salidasIconBadge}>
@@ -552,7 +560,7 @@ export default function App() {
                   </View>
                 </View>
                 <View style={styles.salidasDisponibleBadge}>
-                  <Text style={styles.salidasDisponibleBadgeText}>Disponible</Text>
+                  <Text style={styles.salidasDisponibleBadgeText}>Ver análisis ›</Text>
                 </View>
               </View>
 
@@ -579,29 +587,14 @@ export default function App() {
               />
 
               <Text style={styles.salidasTipText}>
-                💡 Registra salidas escribiendo en el chat: "Gasté 35k en restaurante"
+                💡 Toca para ver en qué gastas más por quincena, mes o 3 meses
               </Text>
-            </View>
+            </TouchableOpacity>
 
-            {/* WIDGET INTEGRADO DE TARJETA DE BONOS SODEXO / PLUXEE */}
-            <BonosDashboardWidget
+            {/* TARJETA COMPACTA DE BONOS (ESTILO SALIDAS & OCIO) */}
+            <BonosCompactCard
               bonosData={dashboardData?.bonos}
-              onPressCategory={(gasto) => handleOpenExpenseModal(gasto, 'bonos')}
-              onRechargePress={() => {
-                setTransferInitialMode('add');
-                setTransferInitialAccount('bonos');
-                setTransferModalVisible(true);
-              }}
-              onQuickExpensePress={() => {
-                const firstBono = dashboardData?.bonos?.gastos?.[0] || {
-                  fila: 24,
-                  nombre: 'Pricesmart',
-                  presupuestoTotal: 700000,
-                  manejoActual: 0
-                };
-                handleOpenExpenseModal(firstBono, 'bonos');
-              }}
-              style={{ marginHorizontal: 16, marginBottom: 14 }}
+              onPress={() => setBonosModalVisible(true)}
             />
 
             {/* ACCESOS RÁPIDOS: ESTADÍSTICAS Y TRANSFERENCIAS */}
@@ -1462,6 +1455,47 @@ export default function App() {
         visible={chartsModalVisible}
         onClose={() => setChartsModalVisible(false)}
         dashboardData={dashboardData}
+      />
+
+      {/* MODAL DETALLE DE SALIDAS & OCIO (ANÁLISIS POR PERIODOS) */}
+      <SalidasDetailModal
+        visible={salidasModalVisible}
+        onClose={() => setSalidasModalVisible(false)}
+        salidasDisponible={salidasManejo}
+        salidasPresupuesto={salidasPresupuestoQ}
+        onAddExpense={() => {
+          setSalidasModalVisible(false);
+          if (itemSalidas) {
+            handleOpenExpenseModal(itemSalidas, 'nomina');
+          }
+        }}
+      />
+
+      {/* MODAL DETALLE COMPLETO DE BONOS */}
+      <BonosDetailModal
+        visible={bonosModalVisible}
+        onClose={() => setBonosModalVisible(false)}
+        bonosData={dashboardData?.bonos}
+        onPressCategory={(gasto) => {
+          setBonosModalVisible(false);
+          handleOpenExpenseModal(gasto, 'bonos');
+        }}
+        onRechargePress={() => {
+          setBonosModalVisible(false);
+          setTransferInitialMode('add');
+          setTransferInitialAccount('bonos');
+          setTransferModalVisible(true);
+        }}
+        onQuickExpensePress={() => {
+          setBonosModalVisible(false);
+          const firstBono = dashboardData?.bonos?.gastos?.[0] || {
+            fila: 24,
+            nombre: 'Pricesmart',
+            presupuestoTotal: 700000,
+            manejoActual: 0
+          };
+          handleOpenExpenseModal(firstBono, 'bonos');
+        }}
       />
 
       {/* MODAL PARA INYECTAR O TRANSFERIR DINERO ENTRE RUBROS */}
@@ -2640,8 +2674,7 @@ const styles = StyleSheet.create({
   quickActionsDashboardRow: {
     flexDirection: 'row',
     gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 14
+    marginBottom: 16
   },
   quickActionDashboardCard: {
     flex: 1,
