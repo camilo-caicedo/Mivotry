@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,11 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert
+  Alert,
+  ScrollView,
+  Animated
 } from 'react-native';
-import { Send, Sparkles, CheckCircle2, XCircle, ArrowRight, CornerDownRight } from 'lucide-react-native';
+import { Send, Sparkles, CheckCircle2, XCircle, ArrowRight, CornerDownRight, Mic, X } from 'lucide-react-native';
 import { CONFIG } from '../config';
 import { MivotryAPI, DashboardResponse } from '../services/api';
+import { VoiceService } from '../services/voiceService';
 
 interface Message {
   id: string;
@@ -36,6 +39,15 @@ interface Props {
   onExpenseRegistered: () => void;
 }
 
+const QUICK_PROMPTS = [
+  '⛽ Gasolina 50k',
+  '🍽️ Almuerzo 25k',
+  '🛒 Pricesmart 100k',
+  '🥬 D1 30k',
+  '🍿 Cine 40k',
+  '🐱 Gatos 50k'
+];
+
 export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegistered }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -47,12 +59,161 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
   ]);
   const [inputText, setInputText] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const inputRef = useRef<TextInput>(null);
+  const flatListRef = useRef<FlatList<Message>>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Animations
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.6)).current;
+  const tooltipAnim = useRef(new Animated.Value(0)).current;
+  const tooltipSlide = useRef(new Animated.Value(10)).current;
+
+  // Pulse animation while listening to voice
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+    if (isListening) {
+      pulseAnim.setValue(1);
+      pulseOpacity.setValue(0.6);
+      animation = Animated.loop(
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.35,
+              duration: 750,
+              useNativeDriver: true
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 750,
+              useNativeDriver: true
+            })
+          ]),
+          Animated.sequence([
+            Animated.timing(pulseOpacity, {
+              toValue: 0.15,
+              duration: 750,
+              useNativeDriver: true
+            }),
+            Animated.timing(pulseOpacity, {
+              toValue: 0.6,
+              duration: 750,
+              useNativeDriver: true
+            })
+          ])
+        ])
+      );
+      animation.start();
+    } else {
+      pulseAnim.setValue(1);
+      pulseOpacity.setValue(0.6);
+    }
+
+    return () => {
+      if (animation) {
+        animation.stop();
+      }
+    };
+  }, [isListening, pulseAnim, pulseOpacity]);
+
+  // Clean up timers and voice listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimerRef.current) {
+        clearTimeout(tooltipTimerRef.current);
+      }
+      VoiceService.stopListening();
+    };
+  }, []);
+
+  const dismissTooltip = () => {
+    if (tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+    }
+    Animated.parallel([
+      Animated.timing(tooltipAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      }),
+      Animated.timing(tooltipSlide, {
+        toValue: 10,
+        duration: 200,
+        useNativeDriver: true
+      })
+    ]).start(() => {
+      setShowTooltip(false);
+    });
+  };
+
+  const triggerTooltip = () => {
+    if (tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current);
+    }
+    setShowTooltip(true);
+    tooltipAnim.setValue(0);
+    tooltipSlide.setValue(10);
+    Animated.parallel([
+      Animated.timing(tooltipAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true
+      }),
+      Animated.timing(tooltipSlide, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true
+      })
+    ]).start();
+
+    tooltipTimerRef.current = setTimeout(() => {
+      dismissTooltip();
+    }, 5000);
+  };
+
+  const handleMicPress = () => {
+    if (VoiceService.isVoiceSupported()) {
+      if (isListening) {
+        VoiceService.stopListening();
+        setIsListening(false);
+      } else {
+        const started = VoiceService.startListening(
+          (transcript: string) => {
+            setInputText(transcript);
+          },
+          (error: string) => {
+            setIsListening(false);
+            console.warn('Voice recognition error:', error);
+          },
+          () => {
+            setIsListening(false);
+          }
+        );
+        if (started) {
+          setIsListening(true);
+        }
+      }
+    } else {
+      // In native / Expo Go where Web Speech API is not available
+      inputRef.current?.focus();
+      triggerTooltip();
+    }
+  };
 
   const formatCOP = (val: number = 0) => '$' + Math.round(val).toLocaleString('es-CO');
 
-  const handleSend = async () => {
-    const text = inputText.trim();
+  const handleSend = async (customText?: string) => {
+    const text = (typeof customText === 'string' ? customText : inputText).trim();
     if (!text || processing) return;
+
+    if (isListening) {
+      VoiceService.stopListening();
+      setIsListening(false);
+    }
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -198,6 +359,11 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
     }
   };
 
+  const handleQuickPrompt = (promptText: string) => {
+    if (processing) return;
+    handleSend(promptText);
+  };
+
   const handleConfirmAction = async (msgId: string, actionCard: NonNullable<Message['actionCard']>) => {
     try {
       setProcessing(true);
@@ -262,9 +428,11 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
       style={styles.container}
     >
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => {
           const isUser = item.sender === 'user';
           return (
@@ -335,20 +503,90 @@ export const ChatAssistant: React.FC<Props> = ({ dashboardData, onExpenseRegiste
         }}
       />
 
+      {/* BANNER ANIMADO DE DICTADO PARA TECLADO MÓVIL */}
+      {showTooltip && (
+        <Animated.View
+          style={[
+            styles.tooltipBanner,
+            {
+              opacity: tooltipAnim,
+              transform: [{ translateY: tooltipSlide }]
+            }
+          ]}
+        >
+          <Text style={styles.tooltipText}>
+            🎙️ Dicta usando el micrófono de tu teclado (Gboard o iOS) para registrar al instante.
+          </Text>
+          <TouchableOpacity
+            onPress={dismissTooltip}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.tooltipCloseBtn}
+          >
+            <X size={16} color="#94A3B8" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* CHIPS RÁPIDOS DE ENTRADA */}
+      <View style={styles.chipsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {QUICK_PROMPTS.map((chip, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.quickChip}
+              onPress={() => handleQuickPrompt(chip)}
+              activeOpacity={0.7}
+              disabled={processing}
+            >
+              <Text style={styles.quickChipText}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* INPUT INFERIOR DE MENSAJES */}
       <View style={styles.inputBar}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder="Escribe un gasto o consulta..."
           placeholderTextColor="#94A3B8"
           value={inputText}
           onChangeText={setInputText}
-          onSubmitEditing={handleSend}
+          onSubmitEditing={() => handleSend()}
           returnKeyType="send"
         />
+
+        {/* BOTÓN DE MICRÓFONO */}
+        <TouchableOpacity
+          style={[styles.micButton, isListening && styles.micButtonActive]}
+          onPress={handleMicPress}
+          activeOpacity={0.7}
+          accessibilityLabel="Dictar por voz"
+        >
+          {isListening && (
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                {
+                  transform: [{ scale: pulseAnim }],
+                  opacity: pulseOpacity
+                }
+              ]}
+            />
+          )}
+          <Mic size={18} color={isListening ? '#FFFFFF' : '#94A3B8'} />
+        </TouchableOpacity>
+
+        {/* BOTÓN DE ENVIAR */}
         <TouchableOpacity
           style={[styles.sendButton, (!inputText.trim() || processing) && styles.sendButtonDisabled]}
-          onPress={handleSend}
+          onPress={() => handleSend()}
           disabled={!inputText.trim() || processing}
         >
           {processing ? (
@@ -507,6 +745,57 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 10
   },
+  tooltipBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F3741',
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  tooltipText: {
+    flex: 1,
+    color: '#F1F5F9',
+    fontSize: 12,
+    lineHeight: 16
+  },
+  tooltipCloseBtn: {
+    padding: 4
+  },
+  chipsWrapper: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#06181D',
+    paddingTop: 8,
+    paddingBottom: 4
+  },
+  chipsScrollContent: {
+    paddingHorizontal: 12,
+    gap: 8
+  },
+  quickChip: {
+    backgroundColor: '#0B2B33',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  quickChipText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '500'
+  },
   inputBar: {
     flexDirection: 'row',
     padding: 12,
@@ -515,7 +804,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
-    gap: 10
+    gap: 8
   },
   input: {
     flex: 1,
@@ -527,6 +816,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  micButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0F3741',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)'
+  },
+  micButtonActive: {
+    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 6
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(239, 68, 68, 0.45)',
+    borderWidth: 2,
+    borderColor: '#EF4444'
   },
   sendButton: {
     width: 40,

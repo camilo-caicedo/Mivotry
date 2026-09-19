@@ -61,6 +61,9 @@ import { SalidasDetailModal } from './src/components/SalidasDetailModal';
 import { SpendingChartsModal } from './src/components/SpendingChartsModal';
 import { TransferOrAddMoneyModal } from './src/components/TransferOrAddMoneyModal';
 import { cacheService } from './src/services/cacheService';
+import { QuickActionsWidget } from './src/components/QuickActionsWidget';
+import { QuickActionExecuteModal } from './src/components/QuickActionExecuteModal';
+import { QuickActionItem } from './src/services/quickActionsService';
 
 const { width } = Dimensions.get('window');
 
@@ -96,6 +99,23 @@ export default function App() {
   const [transferInitialCategory, setTransferInitialCategory] = useState<string | undefined>(undefined);
   const [salidasModalVisible, setSalidasModalVisible] = useState(false);
   const [bonosModalVisible, setBonosModalVisible] = useState(false);
+
+  // Estado para Atajos Rápidos (Quick Actions 1-Tap)
+  const [quickActionToExecute, setQuickActionToExecute] = useState<QuickActionItem | null>(null);
+  const [quickActionModalVisible, setQuickActionModalVisible] = useState(false);
+  const [quickActionModalMode, setQuickActionModalMode] = useState<'execute' | 'create'>('execute');
+
+  const handleSelectQuickAction = (action: QuickActionItem) => {
+    setQuickActionToExecute(action);
+    setQuickActionModalMode('execute');
+    setQuickActionModalVisible(true);
+  };
+
+  const handleCreateQuickAction = () => {
+    setQuickActionToExecute(null);
+    setQuickActionModalMode('create');
+    setQuickActionModalVisible(true);
+  };
 
   const handleInyectarPrima = async () => {
     const monto = parseFloat(primaInputMonto.replace(/[^0-9]/g, ''));
@@ -540,6 +560,12 @@ export default function App() {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* ATAJOS RÁPIDOS (1-TAP QUICK ACTIONS) */}
+            <QuickActionsWidget
+              onSelectAction={handleSelectQuickAction}
+              onNewAction={handleCreateQuickAction}
+            />
 
             {/* TARJETA DEDICADA: FONDO DE SALIDAS (GASTOS VARIABLES) */}
             <TouchableOpacity
@@ -1505,6 +1531,18 @@ export default function App() {
         initialMode={transferInitialMode}
         initialAccount={transferInitialAccount}
         initialCategory={transferInitialCategory}
+      />
+
+      {/* MODAL PARA EJECUTAR / CREAR ATAJOS RÁPIDOS */}
+      <QuickActionExecuteModal
+        visible={quickActionModalVisible}
+        onClose={() => setQuickActionModalVisible(false)}
+        action={quickActionToExecute}
+        mode={quickActionModalMode}
+        dashboardData={dashboardData}
+        onSuccess={() => {
+          fetchDashboard(false);
+        }}
       />
       </SafeAreaView>
     </SafeAreaProvider>
